@@ -74,8 +74,12 @@ Config.Items = {
 -- Load / unload interaction ------------------------------------------------------------------
 Config.Load = {
     duration = 1500,
+    maxDistance = 5.0,  -- server: max horizontal distance player → ground item origin (long props need slack)
     anim = { dict = 'pickup_object', clip = 'pickup_low' },
 }
+
+-- Set a GPS waypoint to the next stop (drop-off / plank pickup / delivery) after each step.
+Config.AutoWaypoint = true
 
 -- Trucks -------------------------------------------------------------------------------------
 -- Keyed by spawn name. Each truck has:
@@ -93,8 +97,8 @@ Config.Trucks = {
         log = {
             max = 2,
             points = {
-                { offset = vec3(-0.35, -1.80, 0.45), rot = vec3(0.0, 0.0, 90.0) },
-                { offset = vec3( 0.35, -1.80, 0.45), rot = vec3(0.0, 0.0, 90.0) },
+                { offset = vec3(-0.35, -1.80, 0.60), rot = vec3(0.0, 0.0, 90.0) },
+                { offset = vec3( 0.35, -1.80, 0.60), rot = vec3(0.0, 0.0, 90.0) },
             },
         },
         plank = 'log',
@@ -142,7 +146,7 @@ Config.Depot = {
 
 -- Lumber mill --------------------------------------------------------------------------------
 Config.Mill = {
-    input        = vec3(-552.0, 5330.0, 73.6), -- where logs are unloaded (player must be within radius)
+    input        = vec3(-552.0, 5330.0, 73.6), -- LOG DROP-OFF: park here; player must be within radius to unload
     conveyorEnd  = vec3(-545.0, 5340.0, 73.6), -- visual only: log slides input → conveyorEnd
     conveyorHeading = 30.0,
     output       = vec4(-540.0, 5345.0, 73.6, 30.0), -- planks appear around here
@@ -174,7 +178,20 @@ Config.XP = {
 
 -- Map blips (set to nil to hide) -------------------------------------------------------------
 Config.Blips = {
-    { coords = vec3(-584.0, 5472.0, 60.0), sprite = 77,  color = 25, label = 'Lumberjack: Forest' },
-    { coords = vec3(-552.0, 5330.0, 73.6), sprite = 478, color = 25, label = 'Lumberjack: Mill & Depot' },
-    { coords = vec3(1200.0, -1300.0, 35.0), sprite = 478, color = 2,  label = 'Lumberjack: Delivery' },
+    { coords = vec3(-584.0, 5472.0, 60.0),  sprite = 77,  color = 25, label = 'Lumberjack: Forest' },
+    { coords = Config.Depot.spawn.xyz,      sprite = 477, color = 25, label = 'Lumberjack: Truck depot' },
+    { coords = Config.Mill.input,           sprite = 478, color = 47, label = 'Lumberjack: Log drop-off' },
+    { coords = Config.Mill.output.xyz,      sprite = 478, color = 3,  label = 'Lumberjack: Plank pickup' },
+    { coords = Config.Delivery.coords,      sprite = 478, color = 2,  label = 'Lumberjack: Plank delivery' },
+}
+
+-- Ground markers + on-screen help when standing inside them ----------------------------------
+Config.Markers = {
+    drawDistance = 60.0,
+    { coords = Config.Mill.input, radius = Config.Mill.radius, color = { 255, 140, 0 },
+      text = 'LOG DROP-OFF  \nPark your truck here, then target it → "Unload log onto conveyor"' },
+    { coords = Config.Mill.output.xyz, radius = Config.Mill.outputSpread + 1.0, color = { 0, 170, 255 },
+      text = 'PLANK PICKUP  \nTarget a plank → "Load planks onto truck"' },
+    { coords = Config.Delivery.coords, radius = Config.Delivery.radius, color = { 0, 200, 0 },
+      text = 'PLANK DELIVERY  \nTarget your truck → "Deliver planks"' },
 }

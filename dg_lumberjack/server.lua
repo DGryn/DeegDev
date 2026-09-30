@@ -52,6 +52,17 @@ local function near(a, b, radius)
     return dx * dx + dy * dy <= radius * radius and math.abs(a.z - b.z) <= Config.MaxHeightDelta
 end
 
+-- Horizontal-only check for trees and ground items: their Z comes from config and can be rough
+-- (the client snaps the props to the ground), so a vertical cap would reject valid actions.
+local function near2D(a, b, radius)
+    local dx, dy = a.x - b.x, a.y - b.y
+    return dx * dx + dy * dy <= radius * radius
+end
+
+local function debugLog(src, msg)
+    if Config.Debug then print(('[dg_lumberjack] %s (%d): %s'):format(GetPlayerName(src) or '?', src, msg)) end
+end
+
 local function jobAllowed(src)
     if not Config.Job then return true end
     local xPlayer = ESX.GetPlayerFromId(src)
@@ -183,7 +194,7 @@ lib.callback.register('lj:startChop', function(src, treeId)
     if not cfg or not tree then return false, 'Invalid tree.' end
     if tree.depleted then return false, 'This tree has already been felled.' end
     if not jobAllowed(src) then return false, 'You are not employed as a lumberjack.' end
-    if not near(pedCoords(src), cfg.coords, Config.Chop.maxDistance + Config.DistanceTolerance) then
+    if not near2D(pedCoords(src), cfg.coords, Config.Chop.maxDistance + Config.DistanceTolerance) then
         return false, 'You are too far from the tree.'
     end
     if exports.ox_inventory:GetItemCount(src, Config.HatchetItem) < 1 then
@@ -224,7 +235,7 @@ lib.callback.register('lj:finishChop', function(src, token, success)
     local id = pending.treeId
     local tree, cfg = Trees[id], Config.Trees.list[id]
     if tree.depleted then return false, 'This tree has already been felled.' end
-    if not near(pedCoords(src), cfg.coords, Config.Chop.maxDistance + Config.DistanceTolerance) then
+    if not near2D(pedCoords(src), cfg.coords, Config.Chop.maxDistance + Config.DistanceTolerance) then
         return false, 'You moved away from the tree.'
     end
 
@@ -267,40 +278,47 @@ end)
 -- so validation + removal are atomic: two players racing for one item → exactly one succeeds.
 -- `stale = true` tells the client the item no longer exists so it can drop its local copy.
 lib.callback.register('lj:loadItem', function(src, itemId, netId)
-    local item = GroundItems[itemId]
-    if not item then return false, 'Someone already took that.', true end
-    if not jobAllowed(src) then return false, 'You are not employed as a lumberjack.' end
+    local ok, msg, stale = (function()
+        local item = GroundItems[itemId]
+        if not item then return false, 'Someone already took that.', true end
+        if not jobAllowed(src) then return false, 'You are not employed as a lumberjack.' end
 
-    if not near(pedCoords(src), item.coords, Config.InteractDistance + Config.DistanceTolerance) then
-        return false, 'You are too far away.'
-    end
+        if not near2D(pedCoords(src), item.coords, Config.Load.maxDistance) then
+            return false, 'You are too far away.'
+        end
 
-    local veh, load = resolveTruck(netId)
-    if not veh then return false, load end
-    if not near(GetEntityCoords(veh), item.coords, Config.TruckRange + Config.DistanceTolerance) then
-        return false, 'Park the truck closer.'
-    end
+        local veh, load = resolveTruck(netId)
+        if not veh then return false, load end
+        if not near2D(GetEntityCoords(veh), item.coords, Config.TruckRange + Config.DistanceTolerance) then
+            return false, 'Park the truck closer.'
+        end
 
-    local key, err = findFreeSlot(load, item.kind)
-    if not key then return false, err end
+        local key, err = findFreeSlot(load, item.kind)
+        if not key then return false, err end
 
-    removeGroundItem(itemId)
-    load.slots[key] = item.kind
-    syncLoad(veh, load)
-    return true, ('Loaded %s onto the truck.'):format(Config.Items[item.kind].label)
+        removeGroundItem(itemId)
+        load.slots[key] = item.kind
+        syncLoad(veh, load)
+        debugLog(src, ('loaded %s #%d into slot %s of %s'):format(item.kind, itemId, key, load.name))
+        return true, ('Loaded %s onto the truck.'):format(Config.Items[item.kind].label)
+    end)()
+
+    if not ok then debugLog(src, ('load item #%s rejected: %s'):format(tostring(itemId), tostring(msg))) end
+    return ok, msg, stale
 end)
 
 ------------------------------------------------------------------------------------------------
 -- Callbacks: mill
 ------------------------------------------------------------------------------------------------
 
--- lj:unloadLog(truckNetId, slotKey) -> ok, msg
+-- lj:unloadLog(truckNetId, slotKey?) -> ok, msg
 -- Removes one tracked log from the truck at the mill and queues it for processing.
+-- slotKey is optional: when targeting the truck body instead of a specific log, any log is taken.
 -- Broadcasts lj:client:conveyor so nearby clients play the conveyor visual.
 lib.callback.register('lj:unloadLog', function(src, netId, key)
-    if type(key) ~= 'string' then return false, 'Invalid slot.' end
+    if key ~= nil and type(key) ~= 'string' then return false, 'Invalid slot.' end
     if not near(pedCoords(src), Config.Mill.input, Config.Mill.radius) then
-        return false, 'Bring the log to the mill conveyor.'
+        return false, 'Go to the log drop-off at the mill conveyor.'
     end
 
     local veh, load = resolveTruck(netId)
@@ -308,7 +326,14 @@ lib.callback.register('lj:unloadLog', function(src, netId, key)
     if not near(GetEntityCoords(veh), Config.Mill.input, Config.Mill.truckRadius) then
         return false, 'Park the truck closer to the conveyor.'
     end
-    if load.slots[key] ~= 'log' then return false, 'There is no log there.' end
+    if key == nil then
+        for k, kind in pairs(load.slots) do
+            if kind == 'log' then key = k break end
+        end
+        if not key then return false, 'There are no logs on this truck.' end
+    elseif load.slots[key] ~= 'log' then
+        return false, 'There is no log there.'
+    end
 
     load.slots[key] = nil
     syncLoad(veh, load)

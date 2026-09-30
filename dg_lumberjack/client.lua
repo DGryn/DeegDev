@@ -14,7 +14,7 @@
       lib.progressBar   https://coxdocs.dev/ox_lib/Modules/Interface/Client/progress
       lib.callback      https://coxdocs.dev/ox_lib/Modules/Callback/Client
       lib.points        https://coxdocs.dev/ox_lib/Modules/Points/Client
-      lib.getNearbyVehicles https://coxdocs.dev/ox_lib/Modules/GetNearbyVehicles/Client
+      GetGamePool       https://docs.fivem.net/natives/?_0x2B9D4F50
       ox_target         https://coxdocs.dev/ox_target/Client  (addLocalEntity, addGlobalVehicle, addSphereZone)
       State bags        https://docs.fivem.net/docs/scripting-manual/networking/state-bags/
       AttachEntityToEntity https://docs.fivem.net/natives/?_0x6B9BBD38AB0796DF
@@ -73,16 +73,61 @@ local function actionProgress(label)
     })
 end
 
--- Closest configured job truck within Config.TruckRange of `coords`.
-local function closestTruck(coords)
-    local best, bestDist
-    for _, v in ipairs(lib.getNearbyVehicles(coords, Config.TruckRange, true)) do
-        if truckName(v.vehicle) then
-            local d = #(coords - v.coords)
-            if not bestDist or d < bestDist then best, bestDist = v.vehicle, d end
+-- Every configured job truck within `range` of `coords`, as { vehicle = handle, dist = number }.
+local function trucksInRange(coords, range)
+    local list = {}
+    for _, veh in ipairs(GetGamePool('CVehicle')) do
+        if truckName(veh) then
+            local d = #(coords - GetEntityCoords(veh))
+            if d <= range then list[#list + 1] = { vehicle = veh, dist = d } end
         end
     end
-    return best
+    return list
+end
+
+local truckLabels
+local function jobTruckLabels()
+    if not truckLabels then
+        local labels = {}
+        for _, cfg in pairs(Config.Trucks) do labels[#labels + 1] = cfg.label end
+        table.sort(labels)
+        truckLabels = table.concat(labels, ' or ')
+    end
+    return truckLabels
+end
+
+-- Closest configured job truck within Config.TruckRange of `coords`, or nil + a message saying why not.
+local function closestTruck(coords)
+    local best, bestDist
+    for _, t in ipairs(trucksInRange(coords, Config.TruckRange)) do
+        if not bestDist or t.dist < bestDist then best, bestDist = t.vehicle, t.dist end
+    end
+    if best then
+        if not NetworkGetEntityIsNetworked(best) then
+            return nil, 'That truck is not networked. Take one out at the mill depot.'
+        end
+        return best
+    end
+
+    local last = GetVehiclePedIsIn(cache.ped, true)
+    if last ~= 0 and not truckName(last) and #(coords - GetEntityCoords(last)) <= Config.TruckRange * 2 then
+        return nil, ('Your vehicle cannot haul timber. Take a %s from the mill depot.'):format(jobTruckLabels())
+    end
+    return nil, ('Park a job truck (%s) within %dm of it.'):format(jobTruckLabels(), math.floor(Config.TruckRange))
+end
+
+-- Sets a GPS waypoint when Config.AutoWaypoint is on.
+local function waypoint(coords)
+    if Config.AutoWaypoint then SetNewWaypoint(coords.x, coords.y) end
+end
+
+local function truckHas(veh, wanted)
+    local slots = Entity(veh).state.ljLoad
+    if not slots then return false end
+    for _, kind in pairs(slots) do
+        if kind == wanted then return true end
+    end
+    return false
 end
 
 ------------------------------------------------------------------------------------------------
@@ -232,14 +277,23 @@ local function loadItem(id)
     local item = Items[id]
     if busy or not item or not item.entity then return end
 
-    local truck = closestTruck(GetEntityCoords(item.entity))
-    if not truck then return notify('Park a job truck closer first.', 'error') end
+    local truck, why = closestTruck(GetEntityCoords(item.entity))
+    if not truck then return notify(why, 'error') end
 
+    local kind = item.data.k
     busy = true
     if actionProgress('Loading...') then
         local ok, msg, stale = lib.callback.await('lj:loadItem', false, id, NetworkGetNetworkIdFromEntity(truck))
         notify(msg, ok and 'success' or 'error')
         if stale then removeItem(id) end
+        if ok then
+            if kind == 'log' then
+                waypoint(Config.Mill.input)
+                notify('Take the logs to the Log drop-off (conveyor) at the mill. GPS set.', 'inform')
+            elseif kind == 'plank' then
+                waypoint(Config.Delivery.coords)
+            end
+        end
     end
     busy = false
 end
@@ -343,8 +397,11 @@ local function buildTruck(veh, slots)
             entry.props[key] = obj
             PropMeta[obj] = { veh = veh, key = key, kind = kind }
             exports.ox_target:addLocalEntity(obj, truckPropOptions)
+        elseif Config.Debug then
+            print(('^3[dg_lumberjack] %s: no attachment point for slot %s (%s)^7'):format(name, key, kind))
         end
     end
+    if Config.Debug then print(('[dg_lumberjack] %s: built %s'):format(name, sig)) end
 end
 
 -- Immediate update when the server changes a truck's load (only fires for vehicles we have).
@@ -354,24 +411,23 @@ AddStateBagChangeHandler('ljLoad', nil, function(bagName, _, value)
     buildTruck(veh, value)
 end)
 
-local function unloadLog(prop)
-    local meta = PropMeta[prop]
-    if busy or not meta then return end
-    busy = true
-    if actionProgress('Unloading onto conveyor...') then
-        local ok, msg = lib.callback.await('lj:unloadLog', false, NetworkGetNetworkIdFromEntity(meta.veh), meta.key)
-        notify(msg, ok and 'success' or 'error')
-    end
-    busy = false
+local function atMillDropOff()
+    return #(GetEntityCoords(cache.ped) - Config.Mill.input) < Config.Mill.radius
 end
 
-local function hasPlanks(veh)
-    local slots = Entity(veh).state.ljLoad
-    if not slots then return false end
-    for _, kind in pairs(slots) do
-        if kind == 'plank' then return true end
+-- Unloads one log: a specific slot when targeting a log prop, any log when targeting the truck body.
+local function unloadLog(veh, key)
+    if busy or not veh then return end
+    busy = true
+    if actionProgress('Unloading onto conveyor...') then
+        local ok, msg = lib.callback.await('lj:unloadLog', false, NetworkGetNetworkIdFromEntity(veh), key)
+        notify(msg, ok and 'success' or 'error')
+        if ok and not truckHas(veh, 'log') then
+            waypoint(Config.Mill.output.xyz)
+            notify('Pick up the finished planks at the mill output.', 'inform')
+        end
     end
-    return false
+    busy = false
 end
 
 local function atDelivery()
@@ -400,10 +456,12 @@ truckPropOptions = {
         distance = Config.InteractDistance,
         canInteract = function(entity)
             local meta = PropMeta[entity]
-            return not busy and meta and meta.kind == 'log'
-                and #(GetEntityCoords(cache.ped) - Config.Mill.input) < Config.Mill.radius
+            return not busy and meta and meta.kind == 'log' and atMillDropOff()
         end,
-        onSelect = function(data) unloadLog(data.entity) end,
+        onSelect = function(data)
+            local meta = PropMeta[data.entity]
+            if meta then unloadLog(meta.veh, meta.key) end
+        end,
     },
     {
         name = 'lj_deliver_prop',
@@ -418,15 +476,25 @@ truckPropOptions = {
     },
 }
 
--- The truck body itself also offers delivery (props may not cover every angle).
+-- The truck body itself also offers unload/delivery, so players don't have to aim at a small prop.
 exports.ox_target:addGlobalVehicle({
+    {
+        name = 'lj_unload_truck',
+        label = 'Unload log onto conveyor',
+        icon = 'fa-solid fa-industry',
+        distance = 3.0,
+        canInteract = function(entity)
+            return not busy and truckName(entity) and atMillDropOff() and truckHas(entity, 'log')
+        end,
+        onSelect = function(data) unloadLog(data.entity) end,
+    },
     {
         name = 'lj_deliver',
         label = 'Deliver planks',
         icon = 'fa-solid fa-hand-holding-dollar',
         distance = 3.0,
         canInteract = function(entity)
-            return not busy and truckName(entity) and atDelivery() and hasPlanks(entity)
+            return not busy and truckName(entity) and atDelivery() and truckHas(entity, 'plank')
         end,
         onSelect = function(data) deliver(data.entity) end,
     },
@@ -442,8 +510,8 @@ CreateThread(function()
                 clearTruck(veh)
             end
         end
-        for _, v in ipairs(lib.getNearbyVehicles(coords, Config.RenderDistance, true)) do
-            if truckName(v.vehicle) then buildTruck(v.vehicle, Entity(v.vehicle).state.ljLoad) end
+        for _, t in ipairs(trucksInRange(coords, Config.RenderDistance)) do
+            buildTruck(t.vehicle, Entity(t.vehicle).state.ljLoad)
         end
         Wait(1000)
     end
@@ -471,6 +539,43 @@ RegisterNetEvent('lj:client:conveyor', function(seconds)
         Wait(0)
     end
     DeleteEntity(obj)
+end)
+
+------------------------------------------------------------------------------------------------
+-- Ground markers + help text (log drop-off, plank pickup, delivery)
+------------------------------------------------------------------------------------------------
+
+CreateThread(function()
+    local markers = Config.Markers or {}
+    local groundZ = {}
+    local shownText
+
+    while true do
+        local sleep = 500
+        local coords = GetEntityCoords(cache.ped)
+        local text
+
+        for i, m in ipairs(markers) do
+            local dist = #(coords - m.coords)
+            if dist < Config.Markers.drawDistance then
+                sleep = 0
+                if not groundZ[i] then
+                    local found, z = GetGroundZFor_3dCoord(m.coords.x, m.coords.y, m.coords.z + 5.0, false)
+                    groundZ[i] = found and z or m.coords.z
+                end
+                local c = m.color
+                DrawMarker(1, m.coords.x, m.coords.y, groundZ[i] - 0.05, 0, 0, 0, 0, 0, 0,
+                    m.radius * 2.0, m.radius * 2.0, 0.6, c[1], c[2], c[3], 90, false, false, 2, false, nil, nil, false)
+                if dist < m.radius then text = m.text end
+            end
+        end
+
+        if text ~= shownText then
+            if text then lib.showTextUI(text, { position = 'left-center' }) else lib.hideTextUI() end
+            shownText = text
+        end
+        Wait(sleep)
+    end
 end)
 
 ------------------------------------------------------------------------------------------------

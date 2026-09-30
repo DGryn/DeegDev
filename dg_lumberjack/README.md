@@ -18,6 +18,17 @@ A civilian lumberjack job for ESX Legacy, using ox_lib, ox_inventory and ox_targ
 
 The resource needs no SQL.
 
+## Player flow
+
+1. At the **Truck depot** ped in the mill yard, take out a job truck (Bison or Flatbed). Other vehicles can't haul timber.
+2. Equip a hatchet, go to the **Forest** blip and target a tree → "Chop tree".
+3. Park the truck within 8 m of a log and target the log → "Load log onto truck". GPS is set to the drop-off.
+4. At the **Log drop-off** (orange ring at the mill), target the truck → "Unload log onto conveyor".
+5. Planks appear at the **Plank pickup** (blue ring). Target them → "Load planks onto truck".
+6. At the **Plank delivery** (green ring), target the truck → "Deliver planks".
+
+With `Config.Debug = true`, the server console logs every load and every rejected load with its reason, and F8 shows which props were attached to each truck.
+
 ## Before the first test, replace the placeholders in `config.lua`
 
 - **Coordinates.** Replace every `vec3`/`vec4` with real positions you copy in-game: trees, depot ped, truck spawn, mill input/end/output, delivery and blips. Tree Z can be rough because the client snaps trees to the ground (`Config.Trees.snapToGround`).
