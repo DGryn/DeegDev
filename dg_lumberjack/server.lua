@@ -252,6 +252,8 @@ lib.callback.register('lj:finishChop', function(src, token, success)
     if tree.chopsLeft <= 0 then
         tree.depleted = true
         tree.respawnAt = os.time() + math.random(Config.Trees.respawnTime.min, Config.Trees.respawnTime.max)
+        -- Tells clients to play the fall animation, away from the player who felled it.
+        TriggerClientEvent('lj:client:treeFelled', -1, id, src)
     end
     syncTree(id)
 

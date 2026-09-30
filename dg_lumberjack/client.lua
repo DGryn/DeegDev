@@ -142,11 +142,12 @@ local function despawnTree(id)
     tree.entity = nil
 end
 
-local function spawnTree(id)
+-- Spawns the standing tree, or the stump when depleted (or when forceStump is set).
+local function spawnTree(id, forceStump)
     local tree, cfg = Trees[id], Config.Trees.list[id]
     despawnTree(id)
 
-    local depleted = tree.state and tree.state.d
+    local depleted = forceStump or (tree.state and tree.state.d) or false
     local model = depleted and Config.Trees.stumpModel or (cfg.model or Config.Trees.model)
     if not loadModel(model) then return end
 
@@ -176,27 +177,62 @@ local function spawnTree(id)
     end
 end
 
--- Tips the standing tree over, then swaps it for the stump.
-local function fellTree(id)
+-- Felling animation. The standing trunk is handed to its own thread and tipped over around its
+-- base; the stump replaces it immediately so the tree's bookkeeping is already in its final state.
+-- fellerServerId (optional) makes the tree fall away from the player who felled it.
+local function fellTree(id, fellerServerId)
     local tree = Trees[id]
-    local obj = tree.entity
-    if not obj or tree.isStump or not DoesEntityExist(obj) then return spawnTree(id) end
+    if not tree or tree.isStump or not tree.entity or not DoesEntityExist(tree.entity) then return end
 
-    exports.ox_target:removeLocalEntity(obj)
+    local trunk = tree.entity
+    exports.ox_target:removeLocalEntity(trunk)
+    tree.entity = nil
+    spawnTree(id, true)
+
+    local fallHeading = GetEntityHeading(trunk)
+    if fellerServerId then
+        local player = GetPlayerFromServerId(fellerServerId)
+        if player ~= -1 then
+            local away = GetEntityCoords(trunk) - GetEntityCoords(GetPlayerPed(player))
+            fallHeading = GetHeadingFromVector_2d(away.x, away.y)
+        end
+    end
+
+    -- Pin the model's lowest point (its base) so the trunk pivots there whatever the prop's origin is.
+    local minDim = GetModelDimensions(GetEntityModel(trunk))
+    local base = GetOffsetFromEntityInWorldCoords(trunk, 0.0, 0.0, minDim.z)
+    SetEntityCollision(trunk, false, false)
+
+    if Config.Debug then print(('[dg_lumberjack] tree %d falling, heading %.0f'):format(id, fallHeading)) end
+
     CreateThread(function()
-        local heading = GetEntityHeading(obj)
         local start = GetGameTimer()
-        while DoesEntityExist(obj) do
+        while DoesEntityExist(trunk) do
             local p = math.min((GetGameTimer() - start) / Config.Trees.fallDuration, 1.0)
-            SetEntityRotation(obj, p * p * Config.Trees.fallAngle, 0.0, heading, 2, false) -- ease-in, like gravity
+            SetEntityRotation(trunk, -(p * p) * Config.Trees.fallAngle, 0.0, fallHeading, 2, false) -- ease-in, like gravity
+            local nowBase = GetOffsetFromEntityInWorldCoords(trunk, 0.0, 0.0, minDim.z)
+            local pos = GetEntityCoords(trunk)
+            SetEntityCoordsNoOffset(trunk, pos.x + base.x - nowBase.x, pos.y + base.y - nowBase.y, pos.z + base.z - nowBase.z, false, false, false)
             if p >= 1.0 then break end
             Wait(0)
         end
+
+        if #(GetEntityCoords(cache.ped) - base) < 40.0 then ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.12) end
         Wait(Config.Trees.lyingTime)
-        -- Only replace if this is still the tree's current prop (player didn't leave range / tree didn't respawn).
-        if Trees[id].entity == obj then spawnTree(id) end
+
+        for alpha = 255, 0, -15 do
+            if not DoesEntityExist(trunk) then break end
+            SetEntityAlpha(trunk, alpha, false)
+            Wait(30)
+        end
+        DeleteEntity(trunk)
     end)
 end
+
+-- lj:client:treeFelled(treeId, fellerServerId) — from the server the moment a tree is felled.
+RegisterNetEvent('lj:client:treeFelled', function(id, feller)
+    fellTree(id, feller)
+end)
 
 local function onTreeState(id, value)
     local tree = Trees[id]
@@ -207,7 +243,8 @@ local function onTreeState(id, value)
 
     local isDepleted = value and value.d
     if isDepleted and not wasDepleted then
-        fellTree(id)
+        -- Normally lj:client:treeFelled has already animated it; this is the fallback if it hasn't.
+        SetTimeout(300, function() fellTree(id) end)
     elseif not isDepleted and wasDepleted then
         spawnTree(id) -- respawned
     end
@@ -367,6 +404,55 @@ end
 
 local truckPropOptions -- defined below (needs unload/deliver functions)
 
+-- Local Z (relative to the vehicle origin) of the bed surface under local (x, y), found with a
+-- downward ray against the vehicle's own collision. Cached per model + position. nil if no hit
+-- (e.g. collision not streamed yet, or the point is off the vehicle).
+local BedHeight = {}
+local function bedSurfaceZ(veh, x, y)
+    local model = GetEntityModel(veh)
+    local cacheKey = ('%d:%.2f:%.2f'):format(model, x, y)
+    if BedHeight[cacheKey] then return BedHeight[cacheKey] end
+
+    local min, max = GetModelDimensions(model)
+    local from = GetOffsetFromEntityInWorldCoords(veh, x, y, max.z + 0.5)
+    local to = GetOffsetFromEntityInWorldCoords(veh, x, y, min.z)
+    local ray = StartExpensiveSynchronousShapeTestLosProbe(from.x, from.y, from.z, to.x, to.y, to.z, 2, 0, 7) -- 2 = vehicles
+    local _, hit, hitCoords, _, hitEntity = GetShapeTestResult(ray)
+    if (hit == 1 or hit == true) and hitEntity == veh then
+        local z = GetOffsetFromEntityGivenWorldCoords(veh, hitCoords.x, hitCoords.y, hitCoords.z).z
+        BedHeight[cacheKey] = z
+        return z
+    end
+end
+
+-- How to lay an item prop flat: returns (height from its origin to its underside, rotation).
+-- Without an explicit rot in config, the prop's longest axis is turned to run along the truck.
+local function itemFit(model, rot)
+    local min, max = GetModelDimensions(model)
+    local size = max - min
+    if rot then return -min.z, rot end
+    if size.z >= size.x and size.z >= size.y then
+        return size.y / 2, vec3(90.0, 0.0, 0.0) -- modelled upright: lay it down lengthways
+    elseif size.x > size.y then
+        return -min.z, vec3(0.0, 0.0, 90.0)
+    end
+    return -min.z, vec3(0.0, 0.0, 0.0)
+end
+
+-- Final attachment offset/rotation for one slot. With Config.AutoBedHeight, point.offset.z is the
+-- height ABOVE the detected bed surface (0 = lying on the bed, ~0.5 = second layer).
+local function resolveAttach(veh, point, itemModel)
+    local lift, rot = itemFit(itemModel, point.rot)
+    local o = point.offset
+    if not Config.AutoBedHeight then return vec3(o.x, o.y, o.z), rot, true end
+
+    local surface = bedSurfaceZ(veh, o.x, o.y)
+    if not surface then return vec3(o.x, o.y, o.z + lift), rot, false end
+    return vec3(o.x, o.y, surface + lift + o.z), rot, true
+end
+
+local BuildRetries = {}
+
 -- (Re)builds the attached props for `veh` from its replicated load. No yields: models are preloaded.
 local function buildTruck(veh, slots)
     local name = truckName(veh)
@@ -382,26 +468,42 @@ local function buildTruck(veh, slots)
     TruckProps[veh] = entry
 
     local vc = GetEntityCoords(veh)
+    local allResolved = true
     for key, kind in pairs(slots) do
         local poolName, index = key:match('^(%a+):(%d+)$')
         local pool = poolName and cfg[poolName]
         local point = type(pool) == 'table' and pool.points[tonumber(index)]
         local item = Config.Items[kind]
         if point and item and ModelOk[item.model] then
+            local offset, rot, resolved = resolveAttach(veh, point, item.model)
+            allResolved = allResolved and resolved
+
             local obj = CreateObjectNoOffset(item.model, vc.x, vc.y, vc.z, false, false, false)
             SetEntityCollision(obj, false, false)
             AttachEntityToEntity(obj, veh, 0,
-                point.offset.x, point.offset.y, point.offset.z,
-                point.rot.x, point.rot.y, point.rot.z,
+                offset.x, offset.y, offset.z,
+                rot.x, rot.y, rot.z,
                 false, false, false, false, 2, true)
             entry.props[key] = obj
             PropMeta[obj] = { veh = veh, key = key, kind = kind }
             exports.ox_target:addLocalEntity(obj, truckPropOptions)
+
+            if Config.Debug then
+                print(('[dg_lumberjack] %s slot %s (%s) at %.2f %.2f %.2f%s'):format(name, key, kind,
+                    offset.x, offset.y, offset.z, resolved and '' or ' ^3(bed surface not found, retrying)^7'))
+            end
         elseif Config.Debug then
             print(('^3[dg_lumberjack] %s: no attachment point for slot %s (%s)^7'):format(name, key, kind))
         end
     end
-    if Config.Debug then print(('[dg_lumberjack] %s: built %s'):format(name, sig)) end
+
+    -- Bed not found (collision still streaming)? Rebuild on the next reconcile tick, up to 10 times.
+    if not allResolved and (BuildRetries[veh] or 0) < 10 then
+        BuildRetries[veh] = (BuildRetries[veh] or 0) + 1
+        entry.sig = nil
+    else
+        BuildRetries[veh] = nil
+    end
 end
 
 -- Immediate update when the server changes a truck's load (only fires for vehicles we have).
@@ -508,6 +610,7 @@ CreateThread(function()
         for veh in pairs(TruckProps) do
             if not DoesEntityExist(veh) or #(GetEntityCoords(veh) - coords) > Config.RenderDistance * 1.5 then
                 clearTruck(veh)
+                BuildRetries[veh] = nil
             end
         end
         for _, t in ipairs(trucksInRange(coords, Config.RenderDistance)) do
@@ -710,7 +813,8 @@ if Config.Debug then
                     local pool = cfg[poolName]
                     if type(pool) == 'table' then
                         for _, p in ipairs(pool.points) do
-                            local w = GetOffsetFromEntityInWorldCoords(veh, p.offset.x, p.offset.y, p.offset.z)
+                            local offset = resolveAttach(veh, p, Config.Items[poolName].model)
+                            local w = GetOffsetFromEntityInWorldCoords(veh, offset.x, offset.y, offset.z)
                             DrawMarker(28, w.x, w.y, w.z, 0, 0, 0, 0, 0, 0, 0.12, 0.12, 0.12, color[1], color[2], color[3], 200, false, false, 2, false, nil, nil, false)
                         end
                     end

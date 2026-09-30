@@ -53,7 +53,7 @@ Config.Trees = {
     respawnTime   = { min = 600, max = 1200 }, -- seconds, random in range
     snapToGround  = true,                  -- client snaps the prop to ground Z (so rough Z in coords is fine)
     fallDuration  = 2500,                  -- ms falling animation
-    fallAngle     = 85.0,                  -- degrees of tilt; flip the sign to change fall direction
+    fallAngle     = 85.0,                  -- degrees of tilt; if trees fall TOWARD the chopper, use -85.0
     lyingTime     = 4000,                  -- ms the felled trunk stays before it becomes the stump
     logDrop       = { min = 1.5, max = 3.0 }, -- ground log spawns this far from the tree base (random direction)
     list = {
@@ -87,8 +87,10 @@ Config.AutoWaypoint = true
 --   log = { max, points }   slot pool for logs
 --   plank = { max, points } separate slot pool for planks, OR plank = 'log' to share the log pool
 --                           (same slots, same attachment points, same max)
--- points: offset (vec3, relative to vehicle origin) and rot (vec3, degrees) per slot.
--- Tune with Config.Debug = true and /ljpoints while sitting in the truck.
+-- points: offset = vec3(x = left/right, y = front/back, z = see Config.AutoBedHeight) relative to
+-- the vehicle's centre. Optional rot = vec3(pitch, roll, yaw) overrides the automatic orientation
+-- (by default each prop is laid flat with its long side running along the truck).
+-- Check positions with Config.Debug = true and /ljpoints while sitting in the truck.
 Config.Trucks = {
     bison = {
         label = 'Bison pickup',
@@ -97,8 +99,8 @@ Config.Trucks = {
         log = {
             max = 2,
             points = {
-                { offset = vec3(-0.35, -1.80, 0.60), rot = vec3(0.0, 0.0, 90.0) },
-                { offset = vec3( 0.35, -1.80, 0.60), rot = vec3(0.0, 0.0, 90.0) },
+                { offset = vec3(-0.35, -1.80, 0.0) },
+                { offset = vec3( 0.35, -1.80, 0.0) },
             },
         },
         plank = 'log',
@@ -110,29 +112,34 @@ Config.Trucks = {
         log = {
             max = 6,
             points = {
-                { offset = vec3(-0.45, -1.5, 0.95), rot = vec3(0.0, 0.0, 90.0) },
-                { offset = vec3( 0.45, -1.5, 0.95), rot = vec3(0.0, 0.0, 90.0) },
-                { offset = vec3(-0.45, -3.2, 0.95), rot = vec3(0.0, 0.0, 90.0) },
-                { offset = vec3( 0.45, -3.2, 0.95), rot = vec3(0.0, 0.0, 90.0) },
-                { offset = vec3( 0.00, -1.5, 1.45), rot = vec3(0.0, 0.0, 90.0) },
-                { offset = vec3( 0.00, -3.2, 1.45), rot = vec3(0.0, 0.0, 90.0) },
+                { offset = vec3(-0.45, -1.5, 0.0) },
+                { offset = vec3( 0.45, -1.5, 0.0) },
+                { offset = vec3(-0.45, -3.2, 0.0) },
+                { offset = vec3( 0.45, -3.2, 0.0) },
+                { offset = vec3( 0.00, -1.5, 0.5) },  -- second layer
+                { offset = vec3( 0.00, -3.2, 0.5) },
             },
         },
         plank = {
             max = 8,
             points = {
-                { offset = vec3(-0.5, -1.0, 0.95), rot = vec3(0.0, 0.0, 0.0) },
-                { offset = vec3( 0.5, -1.0, 0.95), rot = vec3(0.0, 0.0, 0.0) },
-                { offset = vec3(-0.5, -2.2, 0.95), rot = vec3(0.0, 0.0, 0.0) },
-                { offset = vec3( 0.5, -2.2, 0.95), rot = vec3(0.0, 0.0, 0.0) },
-                { offset = vec3(-0.5, -3.4, 0.95), rot = vec3(0.0, 0.0, 0.0) },
-                { offset = vec3( 0.5, -3.4, 0.95), rot = vec3(0.0, 0.0, 0.0) },
-                { offset = vec3(-0.5, -1.0, 1.15), rot = vec3(0.0, 0.0, 0.0) },
-                { offset = vec3( 0.5, -1.0, 1.15), rot = vec3(0.0, 0.0, 0.0) },
+                { offset = vec3(-0.5, -1.0, 0.0) },
+                { offset = vec3( 0.5, -1.0, 0.0) },
+                { offset = vec3(-0.5, -2.2, 0.0) },
+                { offset = vec3( 0.5, -2.2, 0.0) },
+                { offset = vec3(-0.5, -3.4, 0.0) },
+                { offset = vec3( 0.5, -3.4, 0.0) },
+                { offset = vec3(-0.5, -1.0, 0.25) },
+                { offset = vec3( 0.5, -1.0, 0.25) },
             },
         },
     },
 }
+
+-- true: the client finds the bed surface itself (downward ray against the truck at each point's
+-- x/y) and offset.z means "height above the bed". false: offset.z is used as-is, relative to the
+-- vehicle centre.
+Config.AutoBedHeight = true
 
 -- Depot (inside the mill yard) ---------------------------------------------------------------
 Config.Depot = {
