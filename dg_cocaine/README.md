@@ -5,7 +5,7 @@ A cocaine loop for ESX Legacy, built on ox_lib, ox_inventory, ox_target and oxmy
 1. Trade junk with the seed NPC for coke seeds.
 2. Plant the seeds on Cayo Perico or the small islands, then water them. Fertiliser is optional.
 3. About 3 hours later, harvest coca leaves. Anyone can harvest any plant.
-4. At the hidden lab (enter through a door that needs a `Cokelab_keycard`), the mixer turns leaves into paste, then raw cocaine, then cut cocaine. The press turns cut cocaine into bricks.
+4. At the hidden lab (enter through a door that needs a `cokelab_keycard`), the mixer turns leaves into paste, then raw cocaine, then cut cocaine. The press turns cut cocaine into bricks.
 5. Use a brick from your inventory, with scales and 25 baggies, to bag it into 25 bags.
 
 ## Install
@@ -61,7 +61,7 @@ A cocaine loop for ESX Legacy, built on ox_lib, ox_inventory, ox_target and oxmy
     weight = 40,
     stack = true,
 },
-['Cokelab_keycard'] = {
+['cokelab_keycard'] = {
     label = 'Lab Keycard',
     weight = 10,
     stack = false,
@@ -78,7 +78,9 @@ Weights are in grams. With the defaults, one brick (1000) plus 25 baggies turns 
 
 Every plant, the NPC, the lab door and the lab stations always show their options. Picking one you can't do yet tells you why, and no progress bar runs:
 
-- "Not ready yet. Ready in 1h 20m." / "It needs water before it can grow."
+- "Not ready yet (45%)." / "It needs water before it can grow."
+
+Each plant also has a growth line in its target menu: "Needs water", "Growth: 45%" or "Growth: 100% (ready)". Selecting it shows the same text as a notification. It never shows the time left.
 - "You need 10x Coca Leaf (you have 4). You need 1x Gasoline (you have 0)."
 - "The door is locked. You need 1x Lab Keycard (you have 0)."
 

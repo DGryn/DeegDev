@@ -136,11 +136,15 @@ Config.Bagging = {
     duration     = 15000,
 }
 
--- Progress bar animations (ox_lib anim: scenario or dict/clip)
+-- Progress bar animations (ox_lib anim: scenario or dict/clip/flag). An optional `prop` is held during the
+-- bar (ox_lib progress prop: model, bone, pos, rot). Water/fert anims and the can offsets are UNVERIFIED: tweak in-game.
 Config.Anims = {
     plant   = { scenario = 'WORLD_HUMAN_GARDENER_PLANT' },
-    water   = { scenario = 'WORLD_HUMAN_GARDENER_PLANT' },
-    fert    = { scenario = 'WORLD_HUMAN_GARDENER_PLANT' },
+    water   = {
+        dict = 'weapon@w_sp_jerrycan', clip = 'fire', flag = 49, -- pouring, upper body only
+        prop = { model = `prop_wateringcan`, bone = 28422, pos = vec3(0.4, 0.1, 0.0), rot = vec3(90.0, 180.0, 0.0) },
+    },
+    fert    = { dict = 'amb@world_human_gardener_plant@male@base', clip = 'base', flag = 1 }, -- kneeling, full body
     harvest = { scenario = 'WORLD_HUMAN_GARDENER_PLANT' },
     craft   = { scenario = 'PROP_HUMAN_PARKING_METER' },
     bag     = { scenario = 'PROP_HUMAN_PARKING_METER' },

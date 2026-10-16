@@ -40,12 +40,6 @@ local function needText(item, amount)
     return ('You need %dx %s (you have %d).'):format(amount, itemLabel(item), itemCount(item))
 end
 
-local function timeText(ms)
-    local minutes = math.ceil(ms / 60000)
-    if minutes >= 60 then return ('%dh %dm'):format(minutes // 60, minutes % 60) end
-    return ('%dm'):format(minutes)
-end
-
 local function loadModel(model)
     if not IsModelInCdimage(model) then
         print(('^1[dg_cocaine] model %s is not valid, check config.lua^7'):format(model))
@@ -80,6 +74,7 @@ local function action(duration, label, anim, check, callback, ...)
         canCancel = true,
         disable = { move = true, car = true, combat = true },
         anim = anim,
+        prop = anim and anim.prop,
     })
 
     if done then
@@ -104,6 +99,13 @@ local function isReady(plant)
     return plant.readyAt ~= nil and GetGameTimer() >= plant.readyAt
 end
 
+-- 'Needs water' / 'Growth: 45%' / 'Growth: 100% (ready)'. Never shows the time left.
+local function growthText(plant)
+    if not plant.readyAt then return 'Needs water' end
+    if isReady(plant) then return 'Growth: 100% (ready)' end
+    return ('Growth: %d%%'):format(math.floor(progress(plant) * 100))
+end
+
 local function stageFor(plant)
     local p, stage = progress(plant), 1
     if isReady(plant) then p = 1.0 end
@@ -126,7 +128,26 @@ local function spawnPlant(id)
     PlaceObjectOnGroundProperly(obj)
     FreezeEntityPosition(obj, true)
 
+    -- The label is refreshed in canInteract, which ox_target runs every time it builds the menu
+    local growthOption = {
+        name = 'dg_cocaine_growth',
+        icon = 'fa-solid fa-chart-simple',
+        label = 'Growth',
+        distance = Config.InteractDistance,
+        canInteract = function()
+            local p = Plants[id]
+            if not p then return false end
+            growthOption.label = growthText(p)
+            return true
+        end,
+        onSelect = function()
+            local p = Plants[id]
+            if p then notify(growthText(p)) end
+        end,
+    }
+
     exports.ox_target:addLocalEntity(obj, {
+        growthOption,
         {
             name = 'dg_cocaine_water',
             icon = 'fa-solid fa-droplet',
@@ -170,7 +191,7 @@ local function spawnPlant(id)
                     local p = Plants[id]
                     if not p then return 'This plant is gone.' end
                     if not p.readyAt then return 'It needs water before it can grow.' end
-                    if not isReady(p) then return ('Not ready yet. Ready in %s.'):format(timeText(p.readyAt - GetGameTimer())) end
+                    if not isReady(p) then return ('Not ready yet (%d%%).'):format(math.floor(progress(p) * 100)) end
                 end, 'dg_cocaine:harvest', id)
             end,
         },
