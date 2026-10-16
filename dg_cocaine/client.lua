@@ -22,8 +22,28 @@ local function notify(msg, kind)
     if msg then lib.notify({ title = 'Cocaine', description = msg, type = kind or 'inform' }) end
 end
 
+local function itemCount(item)
+    return exports.ox_inventory:Search('count', item) or 0
+end
+
 local function has(item, amount)
-    return (exports.ox_inventory:Search('count', item) or 0) >= (amount or 1)
+    return itemCount(item) >= (amount or 1)
+end
+
+local function itemLabel(item)
+    local data = exports.ox_inventory:Items(item)
+    return data and data.label or item
+end
+
+-- 'You need 10x Coca Leaf (you have 4)'
+local function needText(item, amount)
+    return ('You need %dx %s (you have %d).'):format(amount, itemLabel(item), itemCount(item))
+end
+
+local function timeText(ms)
+    local minutes = math.ceil(ms / 60000)
+    if minutes >= 60 then return ('%dh %dm'):format(minutes // 60, minutes % 60) end
+    return ('%dm'):format(minutes)
 end
 
 local function loadModel(model)
@@ -43,8 +63,14 @@ local function deleteEntity(entity)
 end
 
 -- Runs a progress bar, then asks the server to do the action. One action at a time.
-local function action(duration, label, anim, callback, ...)
+-- `check` (optional) returns a message saying what is missing; then nothing runs and the player is told why.
+-- It is only a hint for the player: the server checks everything again.
+local function action(duration, label, anim, check, callback, ...)
     if busy then return end
+
+    local missing = check and check()
+    if missing then return notify(missing, 'error') end
+
     busy = true
 
     local done = lib.progressBar({
@@ -106,12 +132,14 @@ local function spawnPlant(id)
             icon = 'fa-solid fa-droplet',
             label = 'Water',
             distance = Config.InteractDistance,
-            canInteract = function()
+            canInteract = function() -- hidden once watered (can't be done again)
                 local p = Plants[id]
-                return not busy and p and not p.readyAt and (not Config.Items.water or has(Config.Items.water))
+                return not busy and p and not p.readyAt
             end,
             onSelect = function()
-                action(Config.Plants.waterDuration, 'Watering...', Config.Anims.water, 'dg_cocaine:water', id)
+                action(Config.Plants.waterDuration, 'Watering...', Config.Anims.water, function()
+                    if Config.Items.water and not has(Config.Items.water) then return needText(Config.Items.water, 1) end
+                end, 'dg_cocaine:water', id)
             end,
         },
         {
@@ -119,12 +147,14 @@ local function spawnPlant(id)
             icon = 'fa-solid fa-seedling',
             label = 'Fertilise',
             distance = Config.InteractDistance,
-            canInteract = function()
+            canInteract = function() -- hidden once fertilised (can't be done again)
                 local p = Plants[id]
-                return not busy and p and not p.data.fert and has(Config.Items.fertiliser)
+                return not busy and p and not p.data.fert
             end,
             onSelect = function()
-                action(Config.Plants.fertDuration, 'Fertilising...', Config.Anims.fert, 'dg_cocaine:fertilise', id)
+                action(Config.Plants.fertDuration, 'Fertilising...', Config.Anims.fert, function()
+                    if not has(Config.Items.fertiliser) then return needText(Config.Items.fertiliser, 1) end
+                end, 'dg_cocaine:fertilise', id)
             end,
         },
         {
@@ -133,11 +163,15 @@ local function spawnPlant(id)
             label = 'Harvest',
             distance = Config.InteractDistance,
             canInteract = function()
-                local p = Plants[id]
-                return not busy and p and isReady(p)
+                return not busy and Plants[id] ~= nil
             end,
             onSelect = function()
-                action(Config.Plants.harvestDuration, 'Harvesting...', Config.Anims.harvest, 'dg_cocaine:harvest', id)
+                action(Config.Plants.harvestDuration, 'Harvesting...', Config.Anims.harvest, function()
+                    local p = Plants[id]
+                    if not p then return 'This plant is gone.' end
+                    if not p.readyAt then return 'It needs water before it can grow.' end
+                    if not isReady(p) then return ('Not ready yet. Ready in %s.'):format(timeText(p.readyAt - GetGameTimer())) end
+                end, 'dg_cocaine:harvest', id)
             end,
         },
     })
@@ -213,7 +247,12 @@ exports('useSeed', function()
         return notify('You cannot plant here.', 'error')
     end
 
-    action(Config.Plants.plantDuration, 'Planting...', Config.Anims.plant, 'dg_cocaine:plant', vector3(pos.x, pos.y, groundZ))
+    action(Config.Plants.plantDuration, 'Planting...', Config.Anims.plant, function()
+        for _, zone in ipairs(Config.PlantZones) do
+            if #(vector2(pos.x, pos.y) - zone.coords) <= zone.radius then return end
+        end
+        return 'Nothing would grow here. Try the islands.'
+    end, 'dg_cocaine:plant', vector3(pos.x, pos.y, groundZ))
 end)
 
 ------------------------------------------------------------------------------------------------
@@ -228,14 +267,16 @@ local function trade()
 
     local answer = lib.alertDialog({
         header = 'Seeds',
-        content = ('Bring me %dx %s and I will give you some seeds.'):format(request.amount, request.label),
+        content = ('Bring me %dx %s and I will give you some seeds.  \nYou have %d.'):format(request.amount, request.label, itemCount(request.item)),
         centered = true,
         cancel = true,
         labels = { confirm = 'Hand it over', cancel = 'Leave' },
     })
     if answer ~= 'confirm' then return end
 
-    action(Config.SeedNpc.duration, 'Trading...', Config.Anims.trade, 'dg_cocaine:trade', request.id)
+    action(Config.SeedNpc.duration, 'Trading...', Config.Anims.trade, function()
+        if not has(request.item, request.amount) then return needText(request.item, request.amount) end
+    end, 'dg_cocaine:trade', request.id)
 end
 
 lib.points.new({
@@ -274,12 +315,65 @@ lib.points.new({
 local LabProps = {}
 local LabZones = {}
 
-local function canCraft(recipe)
-    if busy then return false end
+local function teleport(coords)
+    DoScreenFadeOut(500)
+    while not IsScreenFadedOut() do Wait(0) end
+    SetEntityCoords(cache.ped, coords.x, coords.y, coords.z, false, false, false, false)
+    SetEntityHeading(cache.ped, coords.w)
+    Wait(500)
+    DoScreenFadeIn(500)
+end
+
+if Config.LabEntrance.enabled then
+    local entrance = Config.LabEntrance
+
+    LabZones[#LabZones + 1] = exports.ox_target:addSphereZone({
+        coords = entrance.outside.xyz,
+        radius = entrance.radius,
+        debug = Config.Debug,
+        options = {
+            {
+                name = 'dg_cocaine_enter_lab',
+                icon = 'fa-solid fa-door-open',
+                label = 'Enter lab',
+                distance = Config.InteractDistance,
+                canInteract = function() return not busy end,
+                onSelect = function()
+                    if entrance.requireKeycard and not has(Config.Items.keycard) then
+                        return notify('The door is locked. ' .. needText(Config.Items.keycard, 1), 'error')
+                    end
+                    local ok, msg = lib.callback.await('dg_cocaine:enterLab', false)
+                    if not ok then return notify(msg, 'error') end
+                    teleport(entrance.inside)
+                end,
+            },
+        },
+    })
+
+    LabZones[#LabZones + 1] = exports.ox_target:addSphereZone({
+        coords = entrance.inside.xyz,
+        radius = entrance.radius,
+        debug = Config.Debug,
+        options = {
+            {
+                name = 'dg_cocaine_exit_lab',
+                icon = 'fa-solid fa-door-closed',
+                label = 'Exit lab',
+                distance = Config.InteractDistance,
+                canInteract = function() return not busy end,
+                onSelect = function() teleport(entrance.outside) end,
+            },
+        },
+    })
+end
+
+-- Lists every missing input, e.g. 'You need 10x Coca Leaf (you have 4). You need 1x Gasoline (you have 0).'
+local function missingInputs(recipe)
+    local lines = {}
     for _, input in ipairs(recipe.inputs) do
-        if not has(input.item, input.count) then return false end
+        if not has(input.item, input.count) then lines[#lines + 1] = needText(input.item, input.count) end
     end
-    return true
+    if #lines > 0 then return table.concat(lines, ' ') end
 end
 
 for name, station in pairs(Config.Lab) do
@@ -292,9 +386,11 @@ for name, station in pairs(Config.Lab) do
                 icon = recipe.icon,
                 label = recipe.label,
                 distance = Config.InteractDistance,
-                canInteract = function() return canCraft(recipe) end,
+                canInteract = function() return not busy end,
                 onSelect = function()
-                    action(recipe.duration, recipe.label .. '...', Config.Anims.craft, 'dg_cocaine:craft', index)
+                    action(recipe.duration, recipe.label .. '...', Config.Anims.craft, function()
+                        return missingInputs(recipe)
+                    end, 'dg_cocaine:craft', index)
                 end,
             }
         end
@@ -332,14 +428,13 @@ end
 ------------------------------------------------------------------------------------------------
 
 exports('useBrick', function()
-    if busy then return end
-    if not has(Config.Items.scales) then return notify('You need scales.', 'error') end
-    -- The server decides the real yield (and checks baggies again)
-    if not has(Config.Items.baggies, Config.Bagging.bagsPerBrick) then
-        return notify(('You need %d baggies.'):format(Config.Bagging.bagsPerBrick), 'error')
-    end
-
-    action(Config.Bagging.duration, 'Bagging...', Config.Anims.bag, 'dg_cocaine:bag')
+    -- The server decides the real yield (and checks scales and baggies again)
+    action(Config.Bagging.duration, 'Bagging...', Config.Anims.bag, function()
+        if not has(Config.Items.scales) then return needText(Config.Items.scales, 1) end
+        if not has(Config.Items.baggies, Config.Bagging.bagsPerBrick) then
+            return needText(Config.Items.baggies, Config.Bagging.bagsPerBrick)
+        end
+    end, 'dg_cocaine:bag')
 end)
 
 ------------------------------------------------------------------------------------------------

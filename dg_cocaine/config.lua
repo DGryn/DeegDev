@@ -28,6 +28,7 @@ Config.Items = {
     baggies    = 'baggies',
     fertiliser = 'fertcoke', -- placeholder: the weed script's fertiliser item
     water      = 'water',    -- item used up when watering a plant; nil = watering needs no item
+    keycard    = 'Cokelab_keycard', -- lab entrance (see Config.LabEntrance)
 }
 
 -- Streaming / interaction ------------------------------------------------------------------
@@ -69,11 +70,12 @@ Config.Plants = {
     leaves         = { min = 3, max = 5 }, -- coca leaves per harvest
     fertBonus      = { min = 2, max = 3 }, -- extra leaves if fertilised
     -- Growth stages, by growth progress (0.0 = just watered or not watered yet, 1.0 = ready).
-    -- Placeholder models (weed props from the Bikers DLC): swap for your own.
+    -- Props can't be scaled, so the plant swaps model: small bush -> medium bush -> large bush.
+    -- !! UNVERIFIED stock bush models: check them in a prop browser and swap if needed. !!
     stages = {
-        { from = 0.0, model = `bkr_prop_weed_01_small_01c` },
-        { from = 0.5, model = `bkr_prop_weed_med_01a` },
-        { from = 1.0, model = `bkr_prop_weed_lrg_01a` },
+        { from = 0.0, model = `prop_bush_med_01` },
+        { from = 0.5, model = `prop_bush_med_03` },
+        { from = 1.0, model = `prop_bush_lrg_04b` },
     },
 }
 
@@ -85,6 +87,17 @@ Config.PlantZones = {
 }
 
 -- 3. Lab (no blip: players have to find it) ----------------------------------------------------
+
+-- Entrance: 'Enter lab' at the outside door teleports you inside, 'Exit lab' inside teleports you back.
+-- Placeholder coords: the inside point is the Bikers DLC cocaine lab interior (needs the interior loaded, e.g. bob74_ipl).
+Config.LabEntrance = {
+    enabled        = true,  -- false: no entrance targets (use this if your lab is not an interior)
+    requireKeycard = true,  -- false: anyone can enter. The keycard is never used up.
+    outside = vec4(387.0, 3584.0, 33.3, 170.0),     -- door target + where 'Exit lab' puts you
+    inside  = vec4(1088.7, -3187.6, -38.99, 180.0), -- where 'Enter lab' puts you + exit target
+    radius  = 1.0,
+}
+
 -- Each station is an ox_target sphere zone. Set model to also spawn a local prop there (nil = zone only,
 -- e.g. when the map already has a table/press at that spot).
 Config.Lab = {

@@ -246,7 +246,7 @@ end)
 
 lib.callback.register('dg_cocaine:getRequest', function(src)
     if not Request then return end
-    return { id = Request.id, label = Request.label, amount = Request.amount }
+    return { id = Request.id, item = Request.item, label = Request.label, amount = Request.amount }
 end)
 
 lib.callback.register('dg_cocaine:trade', function(src, requestId)
@@ -268,6 +268,17 @@ end)
 ------------------------------------------------------------------------------------------------
 -- Lab
 ------------------------------------------------------------------------------------------------
+
+-- The client teleports itself only after this says yes. Exiting needs no check.
+lib.callback.register('dg_cocaine:enterLab', function(src)
+    local entrance = Config.LabEntrance
+    if not entrance.enabled then return false end
+    if not near(src, entrance.outside) then return false, 'Too far away.' end
+    if entrance.requireKeycard and count(src, Config.Items.keycard) < 1 then
+        return false, 'The door is locked. You need a keycard.'
+    end
+    return true
+end)
 
 lib.callback.register('dg_cocaine:craft', function(src, index)
     local recipe = Config.Recipes[index]
