@@ -60,7 +60,7 @@ Config.SeedNpc = {
 
 -- 2. Plants --------------------------------------------------------------------------------------
 Config.Plants = {
-    growTime       = 2 * 60 * 60, -- seconds from watering to harvestable
+    growTime       = 1 * 60 * 60, -- seconds from watering to harvestable
     maxPerPlayer   = 30,          -- active plants per planter (ESX identifier)
     minSpacing     = 1.0,         -- metres between plants
     plantDuration  = 4000,        -- ms progress bars
@@ -94,7 +94,7 @@ Config.PlantZones = {
 Config.LabEntrance = {
     enabled        = true,  -- false: no entrance targets (use this if your lab is not an interior)
     requireKeycard = true,  -- false: anyone can enter. The keycard is never used up.
-    outside = vec4(387.0, 3584.0, 33.3, 170.0),     -- door target + where 'Exit lab' puts you
+    outside = vec4(387.5107, 3584.6167, 33.2922, 349.2986),     -- door target + where 'Exit lab' puts you
     inside  = vec4(1088.7, -3187.6, -38.99, 180.0), -- where 'Enter lab' puts you + exit target
     radius  = 1.0,
 }
@@ -103,7 +103,7 @@ Config.LabEntrance = {
 -- e.g. when the map already has a table/press at that spot).
 Config.Lab = {
     mixer = { label = 'Mixer', coords = vec3(1093.0, -3196.0, -39.0), heading = 0.0, radius = 1.0, model = nil },
-    press = { label = 'Press', coords = vec3(1097.0, -3196.0, -39.0), heading = 0.0, radius = 1.0, model = nil },
+    press = { label = 'Press', coords = vec3(1102.0404, -3196.2, -38.9935), heading = 0.0, radius = 1.0, model = nil },
 }
 
 -- Decorative props inside the lab (local objects, no interaction). Spawned together while a player is within
@@ -114,14 +114,14 @@ Config.LabProps = {
     enabled = true,
     center  = vec3(1095.0, -3196.0, -39.0),
     list = {
-        { model = `bkr_prop_coke_table01a`,    coords = vec4(1093.0, -3194.5, -39.99, 0.0) },
-        { model = `bkr_prop_coke_table01a`,    coords = vec4(1097.0, -3194.5, -39.99, 0.0) },
-        { model = `bkr_prop_coke_block_01a`,   coords = vec4(1097.2, -3194.4, -39.0, 15.0) },
-        { model = `bkr_prop_coke_cutblock_01`, coords = vec4(1092.6, -3194.4, -39.0, 0.0) },
-        { model = `bkr_prop_coke_scale_01`,    coords = vec4(1093.4, -3194.6, -39.0, 90.0) },
-        { model = `bkr_prop_coke_boxeddoll`,   coords = vec4(1100.0, -3198.0, -39.99, 0.0) },
-        { model = `bkr_prop_coke_pallet_01a`,  coords = vec4(1101.5, -3192.0, -39.99, 90.0) },
-        { model = `prop_barrel_02a`,           coords = vec4(1089.5, -3192.0, -39.99, 0.0) }, -- gasoline drum
+        { model = `bkr_prop_coke_table01a`,    coords = vec4(1101.9429, -3194.5933, -39.9934, 90.3500) },
+        { model = `bkr_prop_coke_block_01a`,   coords = vec4(1101.9133, -3195.0569, -39.9935, 333.8120) },
+        { model = `bkr_prop_coke_block_01a`,   coords = vec4(1101.9133, -3194.0569, -39.9935, 200.8120) },
+        { model = `bkr_prop_coke_press_01aa`,   coords = vec4(1101.9513, -3196.3477, -39.05, 90) },
+        { model = `h4_prop_h4_table_isl_01a`,   coords = vec4(1101.9513, -3196.9, -39.9934, 90) },
+        { model = `bkr_prop_coke_cutblock_01`, coords = vec4(1101.9513, -3196.3477, -38.78, 90) },
+        { model = `bkr_prop_coke_block_01a`,   coords = vec4(1101.9513, -3197.3477, -39.05, 90) },
+
     },
 }
 
@@ -161,7 +161,7 @@ Config.Anims = {
     plant   = { scenario = 'WORLD_HUMAN_GARDENER_PLANT' },
     water   = {
         dict = 'weapon@w_sp_jerrycan', clip = 'fire', flag = 49, -- pouring, upper body only
-        prop = { model = `prop_wateringcan`, bone = 28422, pos = vec3(0.4, 0.1, 0.0), rot = vec3(90.0, 180.0, 0.0) },
+        prop = { model = `prop_wateringcan`, bone = 28422, pos = vec3(0.4, 0.1, 0), rot = vec3(90.0, 180.0, 0.0) },
     },
     fert    = { dict = 'amb@world_human_gardener_plant@male@base', clip = 'base', flag = 1 }, -- kneeling, full body
     harvest = { scenario = 'WORLD_HUMAN_GARDENER_PLANT' },
