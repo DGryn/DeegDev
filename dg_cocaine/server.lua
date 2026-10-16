@@ -105,11 +105,38 @@ local function removePlant(p)
     TriggerClientEvent('dg_cocaine:plantRemoved', -1, p.id)
 end
 
+local function isExpired(p)
+    local expire = Config.Plants.expireTime or 0
+    return expire > 0 and os.time() >= p.plantedAt + expire
+end
+
+-- Removes every expired plant from memory, clients and the database.
+local function removeExpired()
+    local ids = {}
+    for _, p in pairs(Plants) do
+        if isExpired(p) then
+            removePlant(p)
+            ids[#ids + 1] = p.id
+        end
+    end
+    if #ids > 0 then
+        MySQL.update(('DELETE FROM dg_cocaine_plants WHERE id IN (%s)'):format(table.concat(ids, ',')))
+    end
+end
+
 MySQL.ready(function()
     local rows = MySQL.query.await('SELECT * FROM dg_cocaine_plants') or {}
     for _, row in ipairs(rows) do addPlant(row) end
+    removeExpired()
     print(('[dg_cocaine] loaded %d plants'):format(#rows))
     TriggerClientEvent('dg_cocaine:reload', -1) -- clients that started before us ask again
+
+    CreateThread(function()
+        while true do
+            Wait(5 * 60000) -- check for expired plants every 5 minutes
+            removeExpired()
+        end
+    end)
 end)
 
 lib.callback.register('dg_cocaine:getPlants', function()
@@ -192,7 +219,8 @@ end)
 
 lib.callback.register('dg_cocaine:harvest', function(src, id)
     local p = Plants[id]
-    if not p or not isReady(p) then return false, 'It is not ready.' end
+    if not p or isExpired(p) then return false, 'This plant is dead.' end
+    if not isReady(p) then return false, 'It is not ready.' end
     if not near(src, p.coords) then return false, 'Too far away.' end
 
     local leaves = math.random(Config.Plants.leaves.min, Config.Plants.leaves.max)

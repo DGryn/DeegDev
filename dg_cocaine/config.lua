@@ -61,6 +61,7 @@ Config.SeedNpc = {
 -- 2. Plants --------------------------------------------------------------------------------------
 Config.Plants = {
     growTime       = 1 * 2 * 60, -- seconds from watering to harvestable
+    expireTime     = 3 * 24 * 60 * 60, -- seconds after PLANTING that a plant is removed, harvested or not (0 = never)
     maxPerPlayer   = 20,          -- active plants per planter (ESX identifier)
     minSpacing     = 1.0,         -- metres between plants
     plantDuration  = 4000,        -- ms progress bars

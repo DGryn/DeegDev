@@ -77,6 +77,10 @@ local function action(duration, label, anim, check, callback, ...)
         prop = anim and anim.prop,
     })
 
+    -- Scenarios (and looped full-body anims) can keep playing after the bar ends, finished or cancelled,
+    -- leaving the player stuck in them. Always stop whatever the progress bar started.
+    ClearPedTasks(cache.ped)
+
     if done then
         local ok, msg = lib.callback.await(callback, false, ...)
         notify(msg, ok and 'success' or 'error')

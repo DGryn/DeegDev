@@ -4,7 +4,7 @@ A cocaine loop for ESX Legacy, built on ox_lib, ox_inventory, ox_target and oxmy
 
 1. Trade junk with the seed NPC for coke seeds.
 2. Plant the seeds on Cayo Perico or the small islands, then water them. Fertiliser is optional.
-3. About 2 hours later (`Config.Plants.growTime`), harvest coca leaves. Anyone can harvest any plant.
+3. About 2 hours later (`Config.Plants.growTime`), harvest coca leaves. Plants are removed 3 days after planting (`Config.Plants.expireTime`), harvested or not. Anyone can harvest any plant.
 4. At the hidden lab (enter through a door that needs a `cokelab_keycard`), the mixer turns leaves into paste, then raw cocaine, then cut cocaine. The press turns cut cocaine into bricks.
 5. Use a brick from your inventory, with scales and 25 baggies, to bag it into 25 bags.
 
