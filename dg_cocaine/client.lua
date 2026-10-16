@@ -444,6 +444,32 @@ for name, station in pairs(Config.Lab) do
     end
 end
 
+if Config.LabProps.enabled then
+    lib.points.new({
+        coords = Config.LabProps.center,
+        distance = Config.RenderDistance,
+        onEnter = function()
+            for i, prop in ipairs(Config.LabProps.list) do
+                if loadModel(prop.model) then
+                    local c = prop.coords
+                    local obj = CreateObjectNoOffset(prop.model, c.x, c.y, c.z, false, false, false) -- isNetwork = false
+                    SetModelAsNoLongerNeeded(prop.model)
+                    SetEntityHeading(obj, c.w)
+                    FreezeEntityPosition(obj, true)
+                    LabProps['decor:' .. i] = obj
+                end
+            end
+        end,
+        onExit = function()
+            for i in ipairs(Config.LabProps.list) do
+                local key = 'decor:' .. i
+                if LabProps[key] then DeleteEntity(LabProps[key]) end
+                LabProps[key] = nil
+            end
+        end,
+    })
+end
+
 ------------------------------------------------------------------------------------------------
 -- Bagging (ox_inventory: client = { export = 'dg_cocaine.useBrick' })
 ------------------------------------------------------------------------------------------------

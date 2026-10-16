@@ -4,7 +4,7 @@ A cocaine loop for ESX Legacy, built on ox_lib, ox_inventory, ox_target and oxmy
 
 1. Trade junk with the seed NPC for coke seeds.
 2. Plant the seeds on Cayo Perico or the small islands, then water them. Fertiliser is optional.
-3. About 3 hours later, harvest coca leaves. Anyone can harvest any plant.
+3. About 2 hours later (`Config.Plants.growTime`), harvest coca leaves. Anyone can harvest any plant.
 4. At the hidden lab (enter through a door that needs a `cokelab_keycard`), the mixer turns leaves into paste, then raw cocaine, then cut cocaine. The press turns cut cocaine into bricks.
 5. Use a brick from your inventory, with scales and 25 baggies, to bag it into 25 bags.
 
@@ -87,6 +87,8 @@ Each plant also has a growth line in its target menu: "Needs water", "Growth: 45
 The only options that are hidden are steps that can't be repeated: **Water** after a plant is watered, and **Fertilise** after it's fertilised. These hints come from the client. The server still checks everything again.
 
 ## Lab entrance
+
+Decorative lab props live in `Config.LabProps`. Each entry has a model and a `vec4` position and heading. You can add as many as you like, or turn them all off with `enabled = false`. They're local objects that spawn together near `center`, with no interaction. The mixer and press can also each get their own prop through `Config.Lab.<station>.model`.
 
 `Config.LabEntrance`:
 - `enabled`: turns the door targets on or off.

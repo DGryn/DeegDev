@@ -60,7 +60,7 @@ Config.SeedNpc = {
 
 -- 2. Plants --------------------------------------------------------------------------------------
 Config.Plants = {
-    growTime       = 3 * 60 * 60, -- seconds from watering to harvestable
+    growTime       = 2 * 60 * 60, -- seconds from watering to harvestable
     maxPerPlayer   = 30,          -- active plants per planter (ESX identifier)
     minSpacing     = 1.0,         -- metres between plants
     plantDuration  = 4000,        -- ms progress bars
@@ -104,6 +104,25 @@ Config.LabEntrance = {
 Config.Lab = {
     mixer = { label = 'Mixer', coords = vec3(1093.0, -3196.0, -39.0), heading = 0.0, radius = 1.0, model = nil },
     press = { label = 'Press', coords = vec3(1097.0, -3196.0, -39.0), heading = 0.0, radius = 1.0, model = nil },
+}
+
+-- Decorative props inside the lab (local objects, no interaction). Spawned together while a player is within
+-- Config.RenderDistance of `center`. Add, remove or move entries freely; a prop that doesn't exist prints a
+-- warning in F8 and is skipped. !! Models are UNVERIFIED Bikers DLC coke-lab props and coords are placeholders. !!
+-- Tip: if you load the interior with bob74_ipl, its entity sets can already furnish the lab.
+Config.LabProps = {
+    enabled = true,
+    center  = vec3(1095.0, -3196.0, -39.0),
+    list = {
+        { model = `bkr_prop_coke_table01a`,    coords = vec4(1093.0, -3194.5, -39.99, 0.0) },
+        { model = `bkr_prop_coke_table01a`,    coords = vec4(1097.0, -3194.5, -39.99, 0.0) },
+        { model = `bkr_prop_coke_block_01a`,   coords = vec4(1097.2, -3194.4, -39.0, 15.0) },
+        { model = `bkr_prop_coke_cutblock_01`, coords = vec4(1092.6, -3194.4, -39.0, 0.0) },
+        { model = `bkr_prop_coke_scale_01`,    coords = vec4(1093.4, -3194.6, -39.0, 90.0) },
+        { model = `bkr_prop_coke_boxeddoll`,   coords = vec4(1100.0, -3198.0, -39.99, 0.0) },
+        { model = `bkr_prop_coke_pallet_01a`,  coords = vec4(1101.5, -3192.0, -39.99, 90.0) },
+        { model = `prop_barrel_02a`,           coords = vec4(1089.5, -3192.0, -39.99, 0.0) }, -- gasoline drum
+    },
 }
 
 -- One ox_target option per recipe on its station. Inputs are removed and outputs given server-side.
