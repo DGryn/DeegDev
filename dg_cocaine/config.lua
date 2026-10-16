@@ -60,8 +60,8 @@ Config.SeedNpc = {
 
 -- 2. Plants --------------------------------------------------------------------------------------
 Config.Plants = {
-    growTime       = 1 * 60 * 60, -- seconds from watering to harvestable
-    maxPerPlayer   = 30,          -- active plants per planter (ESX identifier)
+    growTime       = 1 * 2 * 60, -- seconds from watering to harvestable
+    maxPerPlayer   = 20,          -- active plants per planter (ESX identifier)
     minSpacing     = 1.0,         -- metres between plants
     plantDuration  = 4000,        -- ms progress bars
     waterDuration  = 3000,
@@ -71,8 +71,8 @@ Config.Plants = {
     fertBonus      = { min = 2, max = 3 }, -- extra leaves if fertilised
     -- One model that grows: its size goes smoothly from scale.min (planted / not watered) to scale.max (ready).
     model   = `h4_prop_bush_cocaplant_01`,
-    scale   = { min = 0.3, max = 1.0 },
-    zOffset = -0.4, -- metres to sink the plant into the ground (negative = lower), so it never floats
+    scale   = { min = 0.9, max = 1.0 },
+    zOffset = -0.05, -- metres to sink the plant into the ground (negative = lower), so it never floats
 }
 
 -- Seeds can only be planted inside one of these circles (2D: x/y + radius). Placeholders.
