@@ -4,8 +4,8 @@ A cocaine loop for ESX Legacy, built on ox_lib, ox_inventory, ox_target and oxmy
 
 1. Trade junk with the seed NPC for coke seeds.
 2. Plant the seeds on Cayo Perico or the small islands, then water them. Fertiliser is optional.
-3. About 3 hours later, harvest coca leaves. Anyone can harvest any plant.
-4. At the hidden lab, the mixer turns leaves into paste, then raw cocaine, then cut cocaine. The press turns cut cocaine into bricks.
+3. About 2 hours later (`Config.Plants.growTime`), harvest coca leaves. Plants are removed 3 days after planting (`Config.Plants.expireTime`), harvested or not. Anyone can harvest any plant.
+4. At the hidden lab (enter through a door that needs a `cokelab_keycard`), the mixer turns leaves into paste, then raw cocaine, then cut cocaine. The press turns cut cocaine into bricks.
 5. Use a brick from your inventory, with scales and 25 baggies, to bag it into 25 bags.
 
 ## Install
@@ -14,7 +14,8 @@ A cocaine loop for ESX Legacy, built on ox_lib, ox_inventory, ox_target and oxmy
 2. Run `dg_cocaine.sql` on your database.
 3. Add the items below to `ox_inventory/data/items.lua`.
 4. Add `ensure dg_cocaine` to `server.cfg`, after `es_extended`, `oxmysql`, `ox_lib`, `ox_inventory` and `ox_target`.
-5. Replace the placeholders in `config.lua`: the NPC, lab and planting-zone coordinates, the trade item pool, and the plant models.
+5. Replace the placeholders in `config.lua`: the NPC, lab, lab entrance and planting-zone coordinates, the trade item pool, and the bush models.
+6. The default lab coordinates are inside the Bikers DLC cocaine lab interior. That interior has to be loaded (for example with bob74_ipl). Or set `Config.LabEntrance.enabled = false` and put the stations wherever you want.
 
 ## ox_inventory items
 
@@ -60,11 +61,41 @@ A cocaine loop for ESX Legacy, built on ox_lib, ox_inventory, ox_target and oxmy
     weight = 40,
     stack = true,
 },
+['cokelab_keycard'] = {
+    label = 'Lab Keycard',
+    weight = 10,
+    stack = false,
+    close = true,
+    description = 'Opens a door somewhere.',
+},
 ```
 
 The seed and brick use `client.export`, so ox_inventory hands the use to this resource instead of removing the item itself. The server removes items only after it has validated the action.
 
 Weights are in grams. With the defaults, one brick (1000) plus 25 baggies turns into 25 bags × 40 = 1000. Bagging gives everything back if the bags don't fit. Check the weight of your existing `baggies` item.
+
+## Targeting
+
+Every plant, the NPC, the lab door and the lab stations always show their options. Picking one you can't do yet tells you why, and no progress bar runs:
+
+- "Not ready yet (45%)." / "It needs water before it can grow."
+
+Each plant also has a growth line in its target menu: "Needs water", "Growth: 45%" or "Growth: 100% (ready)". Selecting it shows the same text as a notification. It never shows the time left.
+- "You need 10x Coca Leaf (you have 4). You need 1x Gasoline (you have 0)."
+- "The door is locked. You need 1x Lab Keycard (you have 0)."
+
+The only options that are hidden are steps that can't be repeated: **Water** after a plant is watered, and **Fertilise** after it's fertilised. These hints come from the client. The server still checks everything again.
+
+## Lab entrance
+
+Decorative lab props live in `Config.LabProps`. Each entry has a model and a `vec4` position and heading. You can add as many as you like, or turn them all off with `enabled = false`. They're local objects that spawn together near `center`, with no interaction. The mixer and press can also each get their own prop through `Config.Lab.<station>.model`.
+
+`Config.LabEntrance`:
+- `enabled`: turns the door targets on or off.
+- `requireKeycard`: turns the keycard check on or off. The server checks for the keycard, and the card is never used up.
+- `outside` / `inside`: the two teleport points.
+
+"Exit lab" inside needs no card. The mixer and press don't check for the card, so anyone already inside can use them.
 
 ## Where the state lives
 
@@ -76,7 +107,7 @@ Weights are in grams. With the defaults, one brick (1000) plus 25 baggies turns 
 
 - Plant props, the NPC and the optional lab props are local entities.
 - They spawn through `lib.points` only within `Config.RenderDistance` and are deleted when you leave, so big batches don't lag.
-- Each plant has three growth stages and changes model as it grows.
+- Each plant is one `h4_prop_bush_cocaplant_01` that grows from `scale.min` to `scale.max` as it grows (`Config.Plants`).
 
 ## Server-side validation
 
