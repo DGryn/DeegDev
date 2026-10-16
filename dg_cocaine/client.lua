@@ -118,18 +118,24 @@ end
 local function spawnPlant(id)
     local plant = Plants[id]
     local stage = stageFor(plant)
-    local model = Config.Plants.stages[stage].model
+    local stageCfg = Config.Plants.stages[stage]
+    local model = stageCfg.model
     if not loadModel(model) then return end
 
+    -- d.z is the ground height saved when it was planted. Put the bottom of the model there (models whose
+    -- origin is in the middle would otherwise float), then sink it by zOffset so it never hovers.
     local d = plant.data
-    local obj = CreateObjectNoOffset(model, d.x, d.y, d.z, false, false, false) -- isNetwork = false
+    local minDim = GetModelDimensions(model)
+    local z = d.z - minDim.z + (stageCfg.zOffset or Config.Plants.zOffset)
+    local obj = CreateObjectNoOffset(model, d.x, d.y, z, false, false, false) -- isNetwork = false
     SetModelAsNoLongerNeeded(model)
     SetEntityHeading(obj, (id * 47) % 360 + 0.0) -- stable "random" rotation per plant
-    PlaceObjectOnGroundProperly(obj)
     FreezeEntityPosition(obj, true)
 
-    -- The label is refreshed in canInteract, which ox_target runs every time it builds the menu
-    local growthOption = {
+    -- The label is refreshed in canInteract, which ox_target runs every time it builds the menu.
+    -- Declared first so canInteract can reference the table it belongs to.
+    local growthOption
+    growthOption = {
         name = 'dg_cocaine_growth',
         icon = 'fa-solid fa-chart-simple',
         label = 'Growth',

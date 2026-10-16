@@ -72,10 +72,12 @@ Config.Plants = {
     -- Growth stages, by growth progress (0.0 = just watered or not watered yet, 1.0 = ready).
     -- Props can't be scaled, so the plant swaps model: small bush -> medium bush -> large bush.
     -- !! UNVERIFIED stock bush models: check them in a prop browser and swap if needed. !!
+    -- zOffset (metres) sinks the model into the ground; negative = lower. A stage can override it.
+    zOffset = -0.3,
     stages = {
         { from = 0.0, model = `prop_bush_med_01` },
         { from = 0.5, model = `prop_bush_med_03` },
-        { from = 1.0, model = `prop_bush_lrg_04b` },
+        { from = 1.0, model = `prop_bush_lrg_04b`, zOffset = -0.5 },
     },
 }
 
