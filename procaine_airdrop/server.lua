@@ -93,10 +93,13 @@ local function makeCandidates(origin, count, here)
         end
 
         local points = {}
+        local px, py = math.cos(rad), math.sin(rad) -- perpendicular to the flight path
+        local side = Config.Location.sideways or 0.0
 
         for i = 1, count do
             local s = offsets[i] - length / 2 -- centre the line on cx, cy
-            points[i] = { x = cx + dx * s, y = cy + dy * s, s = s }
+            local o = (math.random() * 2 - 1) * side -- random sideways scatter
+            points[i] = { x = cx + dx * s + px * o, y = cy + dy * s + py * o, s = s }
         end
 
         candidates[a] = { x = cx, y = cy, heading = heading, points = points }

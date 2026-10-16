@@ -21,7 +21,8 @@ Config.Location = {
     searchRadius = 100.0,             -- how far around that point to look for valid ground if it is unsuitable
     attempts = 15,                    -- candidate spots tried per player before moving on to another player
     maxHeightDiff = 12.0,             -- max ground height difference along the line (rejects cliffs/rooftops)
-    spacing = { min = 4.0, max = 10.0 }, -- random metres between each crate and the next
+    spacing = { min = 2.0, max = 5.0 }, -- random metres between each crate and the next (along the flight path)
+    sideways = 3.0,                      -- each crate lands up to this many metres left/right of the line (0 = straight line)
     timeout = 5000,                   -- ms to wait for the picked player's client to check the ground
 }
 

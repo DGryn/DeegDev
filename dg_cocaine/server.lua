@@ -325,11 +325,11 @@ lib.callback.register('dg_cocaine:craft', function(src, index)
 
     local removed = {}
     for _, input in ipairs(recipe.inputs) do
-        if not exports.ox_inventory:RemoveItem(src, input.item, input.count) then
+        if not input.keep and not exports.ox_inventory:RemoveItem(src, input.item, input.count) then
             for _, r in ipairs(removed) do exports.ox_inventory:AddItem(src, r.item, r.count) end
             return false, 'You are missing ingredients.'
         end
-        removed[#removed + 1] = input
+        if not input.keep then removed[#removed + 1] = input end
     end
 
     for _, output in ipairs(recipe.outputs) do

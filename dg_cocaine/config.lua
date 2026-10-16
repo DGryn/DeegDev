@@ -126,7 +126,8 @@ Config.LabProps = {
 Config.Recipes = {
     {
         station = 'mixer', label = 'Make coca paste', icon = 'fa-solid fa-flask', duration = 8000,
-        inputs  = { { item = Config.Items.leaf, count = 10 }, { item = Config.Items.gasoline, count = 1 } },
+        -- keep = true: the item must be in your inventory but is not used up
+        inputs  = { { item = Config.Items.leaf, count = 10 }, { item = Config.Items.gasoline, count = 1, keep = true } },
         outputs = { { item = Config.Items.paste, count = 1 } },
     },
     {
