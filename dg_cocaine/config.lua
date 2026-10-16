@@ -28,7 +28,7 @@ Config.Items = {
     baggies    = 'baggies',
     fertiliser = 'fertcoke', -- placeholder: the weed script's fertiliser item
     water      = 'water',    -- item used up when watering a plant; nil = watering needs no item
-    keycard    = 'Cokelab_keycard', -- lab entrance (see Config.LabEntrance)
+    keycard    = 'cokelab_keycard', -- lab entrance (see Config.LabEntrance)
 }
 
 -- Streaming / interaction ------------------------------------------------------------------
@@ -84,6 +84,7 @@ Config.PlantZones = {
     { name = 'Cayo Perico',    coords = vec2(4900.0, -5150.0), radius = 1200.0 },
     { name = 'Island (north)', coords = vec2(5600.0, -5900.0), radius = 150.0 },
     { name = 'Island (east)',  coords = vec2(5850.0, -5250.0), radius = 150.0 },
+    { name = 'TEST PLACE',  coords = vec2(345.0169, 3607.8430), radius = 500.0 },
 }
 
 -- 3. Lab (no blip: players have to find it) ----------------------------------------------------
