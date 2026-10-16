@@ -15,7 +15,7 @@
       ox_inventory      https://coxdocs.dev/ox_inventory/Functions/Client#search
 ]]
 
-local Plants = {} -- [id] = { data, readyAt (GetGameTimer ms, nil = not watered), point, entity, stage }
+local Plants = {} -- [id] = { data, readyAt (GetGameTimer ms, nil = not watered), point, entity, scale }
 local busy = false
 
 local function notify(msg, kind)
@@ -106,31 +106,41 @@ local function growthText(plant)
     return ('Growth: %d%%'):format(math.floor(progress(plant) * 100))
 end
 
-local function stageFor(plant)
-    local p, stage = progress(plant), 1
-    if isReady(plant) then p = 1.0 end
-    for i, s in ipairs(Config.Plants.stages) do
-        if p >= s.from then stage = i end
-    end
-    return stage
+-- Plant size for its current growth (rounded so tiny changes don't re-apply the matrix)
+local function scaleFor(plant)
+    local s = Config.Plants.scale
+    local p = isReady(plant) and 1.0 or progress(plant)
+    return math.floor((s.min + (s.max - s.min) * p) * 100 + 0.5) / 100
+end
+
+-- GTA has no scale native for objects, so the plant's matrix is set with scaled axis vectors.
+-- d.z is the ground height saved when it was planted: the (scaled) bottom of the model is put there,
+-- then sunk by Config.Plants.zOffset.
+local function applyScale(id)
+    local plant = Plants[id]
+    local obj, d = plant.entity, plant.data
+    local scale = scaleFor(plant)
+    local minDim = GetModelDimensions(Config.Plants.model)
+    local z = d.z - minDim.z * scale + Config.Plants.zOffset
+
+    local h = math.rad((id * 47) % 360) -- stable "random" rotation per plant
+    local fx, fy = -math.sin(h) * scale, math.cos(h) * scale
+    local rx, ry = math.cos(h) * scale, math.sin(h) * scale
+    SetEntityMatrix(obj, fx, fy, 0.0, rx, ry, 0.0, 0.0, 0.0, scale, d.x, d.y, z)
+    plant.scale = scale
 end
 
 local function spawnPlant(id)
     local plant = Plants[id]
-    local stage = stageFor(plant)
-    local stageCfg = Config.Plants.stages[stage]
-    local model = stageCfg.model
+    local model = Config.Plants.model
     if not loadModel(model) then return end
 
-    -- d.z is the ground height saved when it was planted. Put the bottom of the model there (models whose
-    -- origin is in the middle would otherwise float), then sink it by zOffset so it never hovers.
     local d = plant.data
-    local minDim = GetModelDimensions(model)
-    local z = d.z - minDim.z + (stageCfg.zOffset or Config.Plants.zOffset)
-    local obj = CreateObjectNoOffset(model, d.x, d.y, z, false, false, false) -- isNetwork = false
+    local obj = CreateObjectNoOffset(model, d.x, d.y, d.z, false, false, false) -- isNetwork = false
     SetModelAsNoLongerNeeded(model)
-    SetEntityHeading(obj, (id * 47) % 360 + 0.0) -- stable "random" rotation per plant
     FreezeEntityPosition(obj, true)
+    plant.entity = obj
+    applyScale(id)
 
     -- The label is refreshed in canInteract, which ox_target runs every time it builds the menu.
     -- Declared first so canInteract can reference the table it belongs to.
@@ -203,14 +213,13 @@ local function spawnPlant(id)
         },
     })
 
-    plant.entity, plant.stage = obj, stage
 end
 
 local function despawnPlant(id)
     local plant = Plants[id]
     if not plant then return end
     deleteEntity(plant.entity)
-    plant.entity, plant.stage = nil, nil
+    plant.entity, plant.scale = nil, nil
 end
 
 local function removePlant(id)
@@ -249,16 +258,15 @@ RegisterNetEvent('dg_cocaine:plantUpdated', setPlant)
 RegisterNetEvent('dg_cocaine:plantRemoved', removePlant)
 RegisterNetEvent('dg_cocaine:reload', loadPlants)
 
--- Swap models of spawned plants when they reach the next growth stage
+-- Grow spawned plants: re-apply their size as growth progresses
 CreateThread(function()
     loadPlants()
 
     while true do
         Wait(10000)
         for id, plant in pairs(Plants) do
-            if plant.entity and stageFor(plant) ~= plant.stage then
-                despawnPlant(id)
-                spawnPlant(id)
+            if plant.entity and DoesEntityExist(plant.entity) and scaleFor(plant) ~= plant.scale then
+                applyScale(id)
             end
         end
     end

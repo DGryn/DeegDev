@@ -69,16 +69,10 @@ Config.Plants = {
     harvestDuration = 5000,
     leaves         = { min = 3, max = 5 }, -- coca leaves per harvest
     fertBonus      = { min = 2, max = 3 }, -- extra leaves if fertilised
-    -- Growth stages, by growth progress (0.0 = just watered or not watered yet, 1.0 = ready).
-    -- Props can't be scaled, so the plant swaps model: small bush -> medium bush -> large bush.
-    -- !! UNVERIFIED stock bush models: check them in a prop browser and swap if needed. !!
-    -- zOffset (metres) sinks the model into the ground; negative = lower. A stage can override it.
-    zOffset = -0.3,
-    stages = {
-        { from = 0.0, model = `prop_bush_med_01` },
-        { from = 0.5, model = `prop_bush_med_03` },
-        { from = 1.0, model = `prop_bush_lrg_04b`, zOffset = -0.5 },
-    },
+    -- One model that grows: its size goes smoothly from scale.min (planted / not watered) to scale.max (ready).
+    model   = `h4_prop_bush_cocaplant_01`,
+    scale   = { min = 0.3, max = 1.0 },
+    zOffset = -0.4, -- metres to sink the plant into the ground (negative = lower), so it never floats
 }
 
 -- Seeds can only be planted inside one of these circles (2D: x/y + radius). Placeholders.

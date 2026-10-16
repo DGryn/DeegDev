@@ -107,7 +107,7 @@ Decorative lab props live in `Config.LabProps`. Each entry has a model and a `ve
 
 - Plant props, the NPC and the optional lab props are local entities.
 - They spawn through `lib.points` only within `Config.RenderDistance` and are deleted when you leave, so big batches don't lag.
-- Each plant has three growth stages and changes model as it grows.
+- Each plant is one `h4_prop_bush_cocaplant_01` that grows from `scale.min` to `scale.max` as it grows (`Config.Plants`).
 
 ## Server-side validation
 
