@@ -125,25 +125,66 @@ Config.LabProps = {
 -- One ox_target option per recipe on its station. Inputs are removed and outputs given server-side.
 Config.Recipes = {
     {
-        station = 'mixer', label = 'Make coca paste', icon = 'fa-solid fa-flask', duration = 8000,
+        station = 'mixer', label = 'Make coca paste', icon = 'fa-solid fa-flask', duration = 8000, minigame = 'pour',
         -- keep = true: the item must be in your inventory but is not used up
         inputs  = { { item = Config.Items.leaf, count = 10 }, { item = Config.Items.gasoline, count = 1, keep = true } },
         outputs = { { item = Config.Items.paste, count = 1 } },
     },
     {
-        station = 'mixer', label = 'Make raw cocaine', icon = 'fa-solid fa-flask', duration = 8000,
+        station = 'mixer', label = 'Make raw cocaine', icon = 'fa-solid fa-flask', duration = 8000, minigame = 'sliders',
         inputs  = { { item = Config.Items.paste, count = 1 }, { item = Config.Items.procaine, count = 1 } },
         outputs = { { item = Config.Items.raw, count = 1 } },
     },
     {
-        station = 'mixer', label = 'Cut cocaine', icon = 'fa-solid fa-flask', duration = 8000,
+        station = 'mixer', label = 'Cut cocaine', icon = 'fa-solid fa-flask', duration = 8000, minigame = 'grid',
         inputs  = { { item = Config.Items.raw, count = 1 }, { item = Config.Items.bakingSoda, count = 1 } },
         outputs = { { item = Config.Items.cut, count = 1 } },
     },
     {
-        station = 'press', label = 'Press a brick', icon = 'fa-solid fa-cube', duration = 10000,
+        station = 'press', label = 'Press a brick', icon = 'fa-solid fa-cube', duration = 10000, minigame = 'pressure',
         inputs  = { { item = Config.Items.cut, count = 5 } },
         outputs = { { item = Config.Items.brick, count = 1 } },
+    },
+}
+
+-- Lab minigames (NUI) ----------------------------------------------------------------------------
+-- A recipe with `minigame = '...'` opens that minigame instead of a progress bar (without one it falls back
+-- to the progress bar for `duration`). The minigame ends with a score 0-100; the server turns it into a yield.
+Config.Minigames = {
+    sessionTimeout = 120,  -- seconds a started minigame stays valid (a stuck session can't block the player)
+    cancelLoss     = 0.0,  -- portion of the (used-up) inputs lost when the player cancels (0.0 = nothing)
+    fail           = { below = 40, extraLoss = 0.10 }, -- score < below: lose this extra portion of the inputs
+    minOutput      = 1,    -- never give less than this per output (unless cancelled)
+
+    -- Score -> output multiplier (checked from the top; first `min` the score reaches wins).
+    -- Fractions become a chance: 1 output x 1.2 = 1, plus a 20% chance of a 2nd.
+    tiers = {
+        { min = 90, mult = 1.2 },
+        { min = 70, mult = 1.0 },
+        { min = 40, mult = 0.8 },
+        { min = 0,  mult = 0.5 },
+    },
+
+    -- minTime: seconds. The server rejects a result that arrives sooner (the UI waits this long before sending).
+    pour = {     -- Mixer: leaves + gasoline -> paste. Hold to pour, release inside the band.
+        minTime = 3, rounds = 1,
+        band = 12,        -- band size, % of the gauge
+        fillSpeed = 30,   -- % of the gauge per second while held
+    },
+    sliders = {  -- Mixer: paste + procaine -> raw. Match each slider to its target.
+        minTime = 4, count = 3,
+        tolerance = 4,    -- within this many points of the target counts as perfect
+        timeLimit = 20,   -- seconds
+    },
+    grid = {     -- Mixer: raw + baking soda -> cut. Click the clumps.
+        minTime = 3, size = 5, clumps = 8,
+        timeLimit = 12,   -- seconds
+        penalty = 5,      -- score lost per click on a clean cell (0 = no penalty)
+    },
+    pressure = { -- Press: cut -> brick. Hold to build pressure, release in the green zone.
+        minTime = 3, rounds = 1,
+        zone = 12,        -- green zone size, % of the gauge
+        buildSpeed = 35,  -- % of the gauge per second while held
     },
 }
 

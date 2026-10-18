@@ -122,6 +122,25 @@ Every action is a `lib.callback`, and the server checks it before anything chang
 
 Limitation: the cooldown caps how often an action can succeed. It doesn't prove that the progress bar was shown for the first action.
 
+## Lab minigames
+
+The four mixer and press recipes open an NUI minigame instead of a progress bar. A recipe's `minigame` field picks the game: `pour`, `sliders`, `grid` or `pressure`. Remove the field to bring back the progress bar. Settings for every game are in `Config.Minigames`.
+
+How a craft works:
+
+1. The player picks a station option. The server checks the items, the distance and the cooldown, then opens a session with a one-use token.
+2. The client opens the NUI.
+3. When the game ends, the score goes back with the token. The server rejects the result if any of these is true:
+   - the token is missing, wrong or already used;
+   - the session is older than `sessionTimeout`;
+   - the result arrived sooner than the game's `minTime`;
+   - the player is out of range.
+
+   It then clamps the score to 0-100 and gets a multiplier from `GetYieldMultiplier(score, src)` in `server.lua`, which uses `Config.Minigames.tiers`.
+4. The inputs are removed and the outputs are rolled. The fractional part of the multiplier is a chance of one extra, and every output is at least `minOutput`.
+   - A score under `fail.below` wastes an extra `fail.extraLoss` of the inputs.
+   - Cancelling (ESC, the close button or dying) gives nothing and loses `cancelLoss` of the inputs.
+
 ## Bag yield
 
 `GetBagYield(src)` at the top of the helpers in `server.lua` returns `Config.Bagging.bagsPerBrick`. Replace that function when the skill system exists. The baggies used always equal the yield.
