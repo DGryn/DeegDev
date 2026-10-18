@@ -9,6 +9,7 @@
     Plants[id] (+ MySQL table)     snapshot callback on join + dg_cocaine:plantUpdated / dg_cocaine:plantRemoved events
     Request (seed NPC)             dg_cocaine:getRequest callback (only when a player talks to the NPC)
     Cooldowns[src], Planting[src]  server only
+    Sessions[src] (lab minigames)  server only (the client only gets the one-use token)
 
     API references:
       oxmysql                https://coxdocs.dev/oxmysql
@@ -24,11 +25,21 @@ local OwnerCount = {}  -- [identifier] = number of active plants
 local Cooldowns = {}   -- [src] = { [action] = GetGameTimer() when it may run again }
 local Planting = {}    -- [src] = true while a plant insert is running (blocks double plants past the limit)
 local Request = nil    -- { id, item, label, amount, seeds = { min, max } }
+local Sessions = {}    -- [src] = { token, index, startedAt (GetGameTimer) } while a lab minigame is open
 local nextRequestId = 0
 
 ------------------------------------------------------------------------------------------------
 -- Helpers
 ------------------------------------------------------------------------------------------------
+
+-- Lab minigame score (0-100) -> output multiplier. The skill system can plug in here later;
+-- for now `src` is ignored and only Config.Minigames.tiers is used.
+local function GetYieldMultiplier(score, src)
+    for _, tier in ipairs(Config.Minigames.tiers) do
+        if score >= tier.min then return tier.mult end
+    end
+    return Config.Minigames.tiers[#Config.Minigames.tiers].mult
+end
 
 -- Bags made from one brick (and baggies used). Replace this when the skill system exists.
 local function GetBagYield(src)
@@ -105,11 +116,38 @@ local function removePlant(p)
     TriggerClientEvent('dg_cocaine:plantRemoved', -1, p.id)
 end
 
+local function isExpired(p)
+    local expire = Config.Plants.expireTime or 0
+    return expire > 0 and os.time() >= p.plantedAt + expire
+end
+
+-- Removes every expired plant from memory, clients and the database.
+local function removeExpired()
+    local ids = {}
+    for _, p in pairs(Plants) do
+        if isExpired(p) then
+            removePlant(p)
+            ids[#ids + 1] = p.id
+        end
+    end
+    if #ids > 0 then
+        MySQL.update(('DELETE FROM dg_cocaine_plants WHERE id IN (%s)'):format(table.concat(ids, ',')))
+    end
+end
+
 MySQL.ready(function()
     local rows = MySQL.query.await('SELECT * FROM dg_cocaine_plants') or {}
     for _, row in ipairs(rows) do addPlant(row) end
+    removeExpired()
     print(('[dg_cocaine] loaded %d plants'):format(#rows))
     TriggerClientEvent('dg_cocaine:reload', -1) -- clients that started before us ask again
+
+    CreateThread(function()
+        while true do
+            Wait(5 * 60000) -- check for expired plants every 5 minutes
+            removeExpired()
+        end
+    end)
 end)
 
 lib.callback.register('dg_cocaine:getPlants', function()
@@ -192,7 +230,8 @@ end)
 
 lib.callback.register('dg_cocaine:harvest', function(src, id)
     local p = Plants[id]
-    if not p or not isReady(p) then return false, 'It is not ready.' end
+    if not p or isExpired(p) then return false, 'This plant is dead.' end
+    if not isReady(p) then return false, 'It is not ready.' end
     if not near(src, p.coords) then return false, 'Too far away.' end
 
     local leaves = math.random(Config.Plants.leaves.min, Config.Plants.leaves.max)
@@ -246,7 +285,7 @@ end)
 
 lib.callback.register('dg_cocaine:getRequest', function(src)
     if not Request then return end
-    return { id = Request.id, label = Request.label, amount = Request.amount }
+    return { id = Request.id, item = Request.item, label = Request.label, amount = Request.amount }
 end)
 
 lib.callback.register('dg_cocaine:trade', function(src, requestId)
@@ -269,6 +308,17 @@ end)
 -- Lab
 ------------------------------------------------------------------------------------------------
 
+-- The client teleports itself only after this says yes. Exiting needs no check.
+lib.callback.register('dg_cocaine:enterLab', function(src)
+    local entrance = Config.LabEntrance
+    if not entrance.enabled then return false end
+    if not near(src, entrance.outside) then return false, 'Too far away.' end
+    if entrance.requireKeycard and count(src, Config.Items.keycard) < 1 then
+        return false, 'The door is locked. You need a keycard.'
+    end
+    return true
+end)
+
 lib.callback.register('dg_cocaine:craft', function(src, index)
     local recipe = Config.Recipes[index]
     if not recipe then return false end
@@ -286,17 +336,118 @@ lib.callback.register('dg_cocaine:craft', function(src, index)
 
     local removed = {}
     for _, input in ipairs(recipe.inputs) do
-        if not exports.ox_inventory:RemoveItem(src, input.item, input.count) then
+        if not input.keep and not exports.ox_inventory:RemoveItem(src, input.item, input.count) then
             for _, r in ipairs(removed) do exports.ox_inventory:AddItem(src, r.item, r.count) end
             return false, 'You are missing ingredients.'
         end
-        removed[#removed + 1] = input
+        if not input.keep then removed[#removed + 1] = input end
     end
 
     for _, output in ipairs(recipe.outputs) do
         exports.ox_inventory:AddItem(src, output.item, output.count)
     end
     return true, 'Done.'
+end)
+
+------------------------------------------------------------------------------------------------
+-- Lab minigames: start -> (client plays the NUI) -> finish or cancel
+------------------------------------------------------------------------------------------------
+
+local function sessionExpired(s)
+    return GetGameTimer() - s.startedAt > Config.Minigames.sessionTimeout * 1000
+end
+
+-- base x multiplier, with the fraction as a chance of one more (1 x 1.2 = 1, 20% chance of 2)
+local function rollAmount(base, mult)
+    local exact = base * mult
+    local amount = math.floor(exact)
+    if math.random() < exact - amount then amount = amount + 1 end
+    return math.max(Config.Minigames.minOutput, amount)
+end
+
+-- Removes `portion` (0.0-1.0, rounded down) of each used-up input, if the player still has it.
+local function loseInputs(src, recipe, portion)
+    if portion <= 0 then return end
+    for _, input in ipairs(recipe.inputs) do
+        local amount = math.floor(input.count * portion)
+        if not input.keep and amount > 0 then
+            exports.ox_inventory:RemoveItem(src, input.item, math.min(amount, count(src, input.item)))
+        end
+    end
+end
+
+lib.callback.register('dg_cocaine:startMinigame', function(src, index)
+    local recipe = Config.Recipes[index]
+    if not recipe or not recipe.minigame then return false end
+
+    local current = Sessions[src]
+    if current and not sessionExpired(current) then return false, 'You are already doing something.' end
+    Sessions[src] = nil
+
+    if not near(src, Config.Lab[recipe.station].coords) then return false, 'Too far away.' end
+    for _, input in ipairs(recipe.inputs) do
+        if count(src, input.item) < input.count then return false, 'You are missing ingredients.' end
+    end
+    local best = Config.Minigames.tiers[1].mult -- highest tier: make sure even a perfect score fits
+    for _, output in ipairs(recipe.outputs) do
+        if not exports.ox_inventory:CanCarryItem(src, output.item, math.ceil(output.count * best)) then
+            return false, 'You cannot carry that.'
+        end
+    end
+    if onCooldown(src, 'craft', Config.Minigames[recipe.minigame].minTime * 1000) then return false end
+
+    local token = ('%d%d'):format(math.random(100000, 999999), GetGameTimer())
+    Sessions[src] = { token = token, index = index, startedAt = GetGameTimer() }
+    return token
+end)
+
+lib.callback.register('dg_cocaine:finishMinigame', function(src, token, score)
+    local s = Sessions[src]
+    if not s or s.token ~= token then return false, 'That attempt is no longer valid.' end
+    Sessions[src] = nil -- one use, whatever happens next
+
+    local recipe = Config.Recipes[s.index]
+    local elapsed = GetGameTimer() - s.startedAt
+    if sessionExpired(s) then return false, 'You took too long.' end
+    if elapsed < Config.Minigames[recipe.minigame].minTime * 1000 then return false, 'That was too fast.' end
+    if not near(src, Config.Lab[recipe.station].coords) then return false, 'Too far away.' end
+
+    score = math.max(0, math.min(100, math.floor(tonumber(score) or 0)))
+    local mult = GetYieldMultiplier(score, src)
+
+    local removed = {}
+    for _, input in ipairs(recipe.inputs) do
+        if count(src, input.item) < input.count then
+            for _, r in ipairs(removed) do exports.ox_inventory:AddItem(src, r.item, r.count) end
+            return false, 'You are missing ingredients.'
+        end
+        if not input.keep then
+            exports.ox_inventory:RemoveItem(src, input.item, input.count)
+            removed[#removed + 1] = input
+        end
+    end
+
+    local failed = score < Config.Minigames.fail.below
+    if failed then loseInputs(src, recipe, Config.Minigames.fail.extraLoss) end
+
+    local made = {}
+    for _, output in ipairs(recipe.outputs) do
+        local amount = rollAmount(output.count, mult)
+        exports.ox_inventory:AddItem(src, output.item, amount)
+        local data = exports.ox_inventory:Items(output.item)
+        made[#made + 1] = ('%dx %s'):format(amount, data and data.label or output.item)
+    end
+
+    return true, ('Score %d%%%s. You made %s.'):format(score, failed and ' (botched, some ingredients were wasted)' or '',
+        table.concat(made, ', '))
+end)
+
+lib.callback.register('dg_cocaine:cancelMinigame', function(src, token)
+    local s = Sessions[src]
+    if not s or s.token ~= token then return false end
+    Sessions[src] = nil
+    loseInputs(src, Config.Recipes[s.index], Config.Minigames.cancelLoss)
+    return true
 end)
 
 ------------------------------------------------------------------------------------------------
@@ -329,4 +480,5 @@ end)
 AddEventHandler('playerDropped', function()
     Cooldowns[source] = nil
     Planting[source] = nil
+    Sessions[source] = nil
 end)
