@@ -105,11 +105,38 @@ local function removePlant(p)
     TriggerClientEvent('dg_cocaine:plantRemoved', -1, p.id)
 end
 
+local function isExpired(p)
+    local expire = Config.Plants.expireTime or 0
+    return expire > 0 and os.time() >= p.plantedAt + expire
+end
+
+-- Removes every expired plant from memory, clients and the database.
+local function removeExpired()
+    local ids = {}
+    for _, p in pairs(Plants) do
+        if isExpired(p) then
+            removePlant(p)
+            ids[#ids + 1] = p.id
+        end
+    end
+    if #ids > 0 then
+        MySQL.update(('DELETE FROM dg_cocaine_plants WHERE id IN (%s)'):format(table.concat(ids, ',')))
+    end
+end
+
 MySQL.ready(function()
     local rows = MySQL.query.await('SELECT * FROM dg_cocaine_plants') or {}
     for _, row in ipairs(rows) do addPlant(row) end
+    removeExpired()
     print(('[dg_cocaine] loaded %d plants'):format(#rows))
     TriggerClientEvent('dg_cocaine:reload', -1) -- clients that started before us ask again
+
+    CreateThread(function()
+        while true do
+            Wait(5 * 60000) -- check for expired plants every 5 minutes
+            removeExpired()
+        end
+    end)
 end)
 
 lib.callback.register('dg_cocaine:getPlants', function()
@@ -192,7 +219,8 @@ end)
 
 lib.callback.register('dg_cocaine:harvest', function(src, id)
     local p = Plants[id]
-    if not p or not isReady(p) then return false, 'It is not ready.' end
+    if not p or isExpired(p) then return false, 'This plant is dead.' end
+    if not isReady(p) then return false, 'It is not ready.' end
     if not near(src, p.coords) then return false, 'Too far away.' end
 
     local leaves = math.random(Config.Plants.leaves.min, Config.Plants.leaves.max)
@@ -246,7 +274,7 @@ end)
 
 lib.callback.register('dg_cocaine:getRequest', function(src)
     if not Request then return end
-    return { id = Request.id, label = Request.label, amount = Request.amount }
+    return { id = Request.id, item = Request.item, label = Request.label, amount = Request.amount }
 end)
 
 lib.callback.register('dg_cocaine:trade', function(src, requestId)
@@ -269,6 +297,17 @@ end)
 -- Lab
 ------------------------------------------------------------------------------------------------
 
+-- The client teleports itself only after this says yes. Exiting needs no check.
+lib.callback.register('dg_cocaine:enterLab', function(src)
+    local entrance = Config.LabEntrance
+    if not entrance.enabled then return false end
+    if not near(src, entrance.outside) then return false, 'Too far away.' end
+    if entrance.requireKeycard and count(src, Config.Items.keycard) < 1 then
+        return false, 'The door is locked. You need a keycard.'
+    end
+    return true
+end)
+
 lib.callback.register('dg_cocaine:craft', function(src, index)
     local recipe = Config.Recipes[index]
     if not recipe then return false end
@@ -286,11 +325,11 @@ lib.callback.register('dg_cocaine:craft', function(src, index)
 
     local removed = {}
     for _, input in ipairs(recipe.inputs) do
-        if not exports.ox_inventory:RemoveItem(src, input.item, input.count) then
+        if not input.keep and not exports.ox_inventory:RemoveItem(src, input.item, input.count) then
             for _, r in ipairs(removed) do exports.ox_inventory:AddItem(src, r.item, r.count) end
             return false, 'You are missing ingredients.'
         end
-        removed[#removed + 1] = input
+        if not input.keep then removed[#removed + 1] = input end
     end
 
     for _, output in ipairs(recipe.outputs) do
