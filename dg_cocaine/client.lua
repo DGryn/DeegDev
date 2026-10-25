@@ -415,80 +415,6 @@ local function missingInputs(recipe)
     if #lines > 0 then return table.concat(lines, ' ') end
 end
 
-------------------------------------------------------------------------------------------------
--- Lab minigames (NUI in html/). The server opens a session and hands out a one-use token; the score
--- goes back with that token and the server decides the yield.
-------------------------------------------------------------------------------------------------
-
-local minigame = nil -- promise while the NUI is open; resolves to a score, or false when cancelled
-
-local function closeMinigame(result)
-    if not minigame then return end
-    local p = minigame
-    minigame = nil
-    SetNuiFocus(false, false)
-    SendNUIMessage({ action = 'close' })
-    p:resolve(result)
-end
-
-RegisterNUICallback('finish', function(data, cb)
-    cb('ok')
-    closeMinigame(tonumber(data.score) or 0)
-end)
-
-RegisterNUICallback('cancel', function(_, cb)
-    cb('ok')
-    closeMinigame(false)
-end)
-
-local function playMinigame(index, recipe)
-    if busy or minigame then return end
-
-    local missing = missingInputs(recipe)
-    if missing then return notify(missing, 'error') end
-
-    busy = true
-    local token, msg = lib.callback.await('dg_cocaine:startMinigame', false, index)
-    if not token then
-        notify(msg, 'error')
-        busy = false
-        return
-    end
-
-    if Config.Anims.craft.scenario then TaskStartScenarioInPlace(cache.ped, Config.Anims.craft.scenario, 0, true) end
-
-    minigame = promise.new()
-    local p = minigame
-    SetNuiFocus(true, true)
-    SendNUIMessage({
-        action = 'open',
-        game = recipe.minigame,
-        title = recipe.label,
-        settings = Config.Minigames[recipe.minigame],
-    })
-
-    -- Dying closes it (counts as a cancel)
-    CreateThread(function()
-        while minigame == p do
-            if IsEntityDead(cache.ped) then closeMinigame(false) end
-            Wait(250)
-        end
-    end)
-
-    local score = Citizen.Await(p)
-    ClearPedTasks(cache.ped)
-
-    if score then
-        local ok, result = lib.callback.await('dg_cocaine:finishMinigame', false, token, score)
-        notify(result, ok and 'success' or 'error')
-    else
-        lib.callback.await('dg_cocaine:cancelMinigame', false, token)
-        notify('Cancelled.', 'error')
-    end
-
-    busy = false
-end
-
 for name, station in pairs(Config.Lab) do
     local options = {}
 
@@ -501,7 +427,6 @@ for name, station in pairs(Config.Lab) do
                 distance = Config.InteractDistance,
                 canInteract = function() return not busy end,
                 onSelect = function()
-                    if recipe.minigame then return playMinigame(index, recipe) end
                     action(recipe.duration, recipe.label .. '...', Config.Anims.craft, function()
                         return missingInputs(recipe)
                     end, 'dg_cocaine:craft', index)
@@ -583,7 +508,6 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
-    if minigame then SetNuiFocus(false, false) end
     for id in pairs(Plants) do despawnPlant(id) end
     deleteEntity(npc)
     for _, obj in pairs(LabProps) do DeleteEntity(obj) end
