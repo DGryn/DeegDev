@@ -116,25 +116,42 @@ Config.AdminGroups = { admin = true, superadmin = true }
 ---------------------------------------------------------------------
 Config.Locations = {
     -- City (south / east Los Santos)
-    vector4(-14.60, -1441.60, 31.10, 180.0),   -- Forum Dr / Grove St area
+    vector4(-14.16, -1442.37, 31.10, 0.0),   -- Forum Dr / Grove St area
+    vector4(-64.09, -1449.86, 32.52, 14.2), -- forum dr
     vector4(126.70, -1930.00, 21.40, 210.0),   -- Grove St
     vector4(85.40, -1959.20, 21.10, 320.0),    -- Grove St
+    vector4(55.71, -1921.08, 21.63, 147.4), -- Grove St
+    vector4(23.67, -1896.36, 22.96, 138.9), -- GST
+    vector4(-33.26, -1847.39, 26.18, 90.7), -- gst
+    vector4(491.68, -1715.21, 29.31, 65.2), -- James Town
+    vector4(473.97, -1775.53, 28.69, 87.9), -- Jms T
+    vector4(495.48, -1822.00, 28.86, 184.3), -- Jms t
+    vector4(399.82, -1864.60, 26.70, 116.2), -- Jms T
     vector4(236.50, -1717.80, 29.30, 320.0),   -- Davis
     vector4(1273.90, -1719.70, 54.80, 30.0),   -- El Burro Heights
     vector4(1301.00, -573.90, 71.70, 340.0),   -- Mirror Park / Nikola Pl
     vector4(1060.50, -378.30, 68.20, 40.0),    -- Mirror Park
     vector4(1010.40, -423.40, 65.40, 130.0),   -- Mirror Park
+    vector4(1302.67, -528.66, 71.45, 345.8), -- Nik
+    vector4(1347.97, -547.60, 73.88, 343.0), -- nik
+    vector4(1385.64, -592.89, 74.47, 235.3), -- Nikk
 
-    -- Suburbs / hills / west side
-    vector4(-817.00, 178.00, 72.20, 110.0),    -- Rockford Hills
-    vector4(7.80, 538.60, 176.00, 150.0),      -- Vinewood Hills
-    vector4(-174.70, 502.60, 137.40, 190.0),   -- Vinewood Hills
-    vector4(-1294.40, 454.60, 97.50, 0.0),     -- Richman
-    vector4(-1150.00, -1520.00, 4.40, 35.0),   -- Vespucci Canals
-    vector4(-1100.00, -1600.00, 4.40, 125.0),  -- Vespucci Beach
-    vector4(-3093.80, 349.40, 7.50, 255.0),    -- Chumash / Banham Canyon
+    -- Beach front
+    vector4(-1968.22, -532.44, 12.16, 326.0), -- Beach Front
+    vector4(-1849.40, -632.60, 11.15, 328.8), -- Beach Front
+    vector4(-1814.53, -665.00, 10.78, 326.0), -- Beach Front
+    vector4(-1791.74, -683.74, 10.63, 323.1), -- Beach Front
+    vector4(-1753.58, -724.73, 10.34, 328.8), -- Beach Front
+
 
     -- Rural
+    vector4(2176.06, 3320.61, 45.96, 28.3), -- Trailer
+    vector4(2202.59, 3318.91, 46.11, 107.7), -- Trailer
+    vector4(55.32, 3741.75, 39.68, 39.7), -- Stab City Trailer
+    vector4(34.36, 3666.29, 39.71, 62.4), -- Stab city trailer
+
+    vector4(1879.71, 3920.74, 33.19, 283.5), -- sandy
+
     vector4(1973.60, 3815.30, 33.40, 30.0),    -- Sandy Shores
     vector4(1435.60, 3657.30, 34.40, 200.0),   -- Sandy Shores
     vector4(70.00, 3700.00, 39.70, 60.0),      -- Stab City
