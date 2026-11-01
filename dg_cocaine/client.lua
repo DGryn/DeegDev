@@ -56,9 +56,7 @@ local function deleteEntity(entity)
     end
 end
 
--- Runs a progress bar, then asks the server to do the action. One action at a time.
--- `check` (optional) returns a message saying what is missing; then nothing runs and the player is told why.
--- It is only a hint for the player: the server checks everything again.
+
 local function action(duration, label, anim, check, callback, ...)
     if busy then return end
 
@@ -77,8 +75,8 @@ local function action(duration, label, anim, check, callback, ...)
         prop = anim and anim.prop,
     })
 
-    -- Scenarios (and looped full-body anims) can keep playing after the bar ends, finished or cancelled,
-    -- leaving the player stuck in them. Always stop whatever the progress bar started.
+    -- Scenarios 
+    -- incase bug
     ClearPedTasks(cache.ped)
 
     if done then
@@ -89,9 +87,10 @@ local function action(duration, label, anim, check, callback, ...)
     busy = false
 end
 
-------------------------------------------------------------------------------------------------
+
+
+
 -- Plants
-------------------------------------------------------------------------------------------------
 
 local function progress(plant)
     if not plant.readyAt then return 0.0 end
@@ -110,16 +109,13 @@ local function growthText(plant)
     return ('Growth: %d%%'):format(math.floor(progress(plant) * 100))
 end
 
--- Plant size for its current growth (rounded so tiny changes don't re-apply the matrix)
+-- Plant size for its current growth 
 local function scaleFor(plant)
     local s = Config.Plants.scale
     local p = isReady(plant) and 1.0 or progress(plant)
     return math.floor((s.min + (s.max - s.min) * p) * 100 + 0.5) / 100
 end
 
--- GTA has no scale native for objects, so the plant's matrix is set with scaled axis vectors.
--- d.z is the ground height saved when it was planted: the (scaled) bottom of the model is put there,
--- then sunk by Config.Plants.zOffset.
 local function applyScale(id)
     local plant = Plants[id]
     local obj, d = plant.entity, plant.data

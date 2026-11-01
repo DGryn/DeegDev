@@ -3,18 +3,18 @@ game 'gta5'
 lua54 'yes'
 
 name 'dg_cocaine'
-description 'Cocaine: trade for seeds, grow on the islands, process at a hidden lab, bag bricks.'
+description 'Cocaine.'
 version '1.0.0'
 
 shared_scripts {
-    '@ox_lib/init.lua', -- https://coxdocs.dev/ox_lib (enables lib.* in every script)
+    '@ox_lib/init.lua',
     'config.lua',
 }
 
 client_script 'client.lua'
 
 server_scripts {
-    '@oxmysql/lib/MySQL.lua', -- https://coxdocs.dev/oxmysql
+    '@oxmysql/lib/MySQL.lua', 
     'server.lua',
 }
 

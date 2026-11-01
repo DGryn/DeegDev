@@ -1,18 +1,9 @@
---[[
-    dg_cocaine - config.lua (shared: loaded by client AND server)
-
-    Every tunable value lives here. Nothing gameplay-related is hardcoded in client.lua/server.lua.
-
-    !! COORDINATES, PROP/PED MODELS AND THE TRADE ITEM POOL BELOW ARE PLACEHOLDERS !!
-    Stand at each spot in-game and copy your real coords. Trade items that don't exist in
-    ox_inventory are skipped with a console warning when the resource starts.
-]]
 
 Config = {}
 
 Config.Debug = false -- true: ox_target zone outlines at the lab
 
--- Item names (ox_inventory) -------------------------------------------------------------------
+-- Item names (ox_inventory) 
 Config.Items = {
     seed       = 'coke_seed',
     leaf       = 'coca_leaf',
@@ -31,12 +22,12 @@ Config.Items = {
     keycard    = 'cokelab_keycard', -- lab entrance (see Config.LabEntrance)
 }
 
--- Streaming / interaction ------------------------------------------------------------------
+-- Streaming / interaction 
 Config.RenderDistance    = 60.0 -- plant props (and the seed NPC) only exist on a client inside this range
 Config.InteractDistance  = 2.0  -- ox_target option distance
 Config.ServerDistance    = 5.0  -- server: max distance between the player and the plant/NPC/station they act on
 
--- 1. Seed NPC ----------------------------------------------------------------------------------
+-- 1. Seed NPC 
 -- The NPC asks everyone for the same thing; the request changes every rotateMinutes.
 Config.SeedNpc = {
     model         = `a_m_m_hillbilly_01`,
@@ -58,9 +49,9 @@ Config.SeedNpc = {
     },
 }
 
--- 2. Plants --------------------------------------------------------------------------------------
+-- 2. Plants 
 Config.Plants = {
-    growTime       = 1 * 2 * 60, -- seconds from watering to harvestable
+    growTime       = 2 * 60 * 60, -- seconds from watering to harvestable
     expireTime     = 3 * 24 * 60 * 60, -- seconds after PLANTING that a plant is removed, harvested or not (0 = never)
     maxPerPlayer   = 20,          -- active plants per planter (ESX identifier)
     minSpacing     = 1.0,         -- metres between plants
@@ -84,7 +75,7 @@ Config.PlantZones = {
     { name = 'TEST PLACE',  coords = vec2(345.0169, 3607.8430), radius = 500.0 },
 }
 
--- 3. Lab (no blip: players have to find it) ----------------------------------------------------
+-- 3. Lab (no blip: players have to find it) 
 
 -- Entrance: 'Enter lab' at the outside door teleports you inside, 'Exit lab' inside teleports you back.
 -- Placeholder coords: the inside point is the Bikers DLC cocaine lab interior (needs the interior loaded, e.g. bob74_ipl).
@@ -147,7 +138,7 @@ Config.Recipes = {
     },
 }
 
--- 4. Bagging (use a brick from the inventory) ----------------------------------------------------
+-- 4. Bagging (use a brick from the inventory) 
 Config.Bagging = {
     bagsPerBrick = 25,   -- also the number of baggies used. A skill system can replace GetBagYield in server.lua.
     duration     = 15000,

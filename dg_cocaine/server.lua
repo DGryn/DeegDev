@@ -1,23 +1,6 @@
---[[
-    dg_cocaine - server.lua
 
-    The server owns all state and decides every reward. Clients only draw props and ask for
-    actions through lib.callback; every action is re-checked here (items, distance, plant state,
-    cooldown) before anything is removed or given.
 
-    State                          Replicated to clients via
-    Plants[id] (+ MySQL table)     snapshot callback on join + dg_cocaine:plantUpdated / dg_cocaine:plantRemoved events
-    Request (seed NPC)             dg_cocaine:getRequest callback (only when a player talks to the NPC)
-    Cooldowns[src], Planting[src]  server only
-
-    API references:
-      oxmysql                https://coxdocs.dev/oxmysql
-      ox_lib callbacks       https://coxdocs.dev/ox_lib/Modules/Callback/Server
-      ox_inventory           https://coxdocs.dev/ox_inventory/Functions/Server
-      ESX xPlayer            https://docs.esx-framework.org/legacy/Server/Classes/xPlayer
-]]
-
-local ESX = exports['es_extended']:getSharedObject() -- https://docs.esx-framework.org/legacy/Server/Functions/getSharedObject
+local ESX = exports['es_extended']:getSharedObject()
 
 local Plants = {}      -- [id] = { id, owner, coords (vector3), plantedAt, wateredAt (nil = not watered), fertilised }
 local OwnerCount = {}  -- [identifier] = number of active plants
@@ -26,9 +9,9 @@ local Planting = {}    -- [src] = true while a plant insert is running (blocks d
 local Request = nil    -- { id, item, label, amount, seeds = { min, max } }
 local nextRequestId = 0
 
-------------------------------------------------------------------------------------------------
+
 -- Helpers
-------------------------------------------------------------------------------------------------
+
 
 -- Bags made from one brick (and baggies used). Replace this when the skill system exists.
 local function GetBagYield(src)
@@ -68,9 +51,9 @@ local function inPlantZone(coords)
     return false
 end
 
-------------------------------------------------------------------------------------------------
+
 -- Plants
-------------------------------------------------------------------------------------------------
+
 
 -- What clients get: position, flags and seconds left until ready (nil = not watered yet).
 local function clientPlant(p)
@@ -237,9 +220,9 @@ lib.callback.register('dg_cocaine:harvest', function(src, id)
     return true, ('You harvested %d coca leaves.'):format(leaves)
 end)
 
-------------------------------------------------------------------------------------------------
+
 -- Seed NPC (one request for everyone, rotated on a timer)
-------------------------------------------------------------------------------------------------
+
 
 local TradePool = {}
 
@@ -293,9 +276,9 @@ lib.callback.register('dg_cocaine:trade', function(src, requestId)
     return true, ('He hands you %d seeds.'):format(seeds)
 end)
 
-------------------------------------------------------------------------------------------------
+
 -- Lab
-------------------------------------------------------------------------------------------------
+
 
 -- The client teleports itself only after this says yes. Exiting needs no check.
 lib.callback.register('dg_cocaine:enterLab', function(src)
@@ -338,9 +321,9 @@ lib.callback.register('dg_cocaine:craft', function(src, index)
     return true, 'Done.'
 end)
 
-------------------------------------------------------------------------------------------------
+
 -- Bagging
-------------------------------------------------------------------------------------------------
+
 
 lib.callback.register('dg_cocaine:bag', function(src)
     local yield = GetBagYield(src)
