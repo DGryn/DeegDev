@@ -75,7 +75,7 @@ Config.Exit = {
 -- Laptop (sign in / sign out)
 ------------------------------------------------------------------------------------------------
 Config.Laptop = {
-    coords = vec4(1048.5372, -3100.7546, -38.1755, 88.0837),
+    coords = vec4(1048.5372, -3100.7546, -39.1, 88.0837),
     radius = 0.8,
 
     -- The warehouse interior has a desk with a laptop on it, so this script normally only adds the
