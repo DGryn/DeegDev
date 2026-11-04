@@ -9,7 +9,8 @@
       vec4(x, y, z, heading)  a position plus the direction to face (0-360)
 
     Values marked PLACEHOLDER are guesses. Player/ped positions (spawnInside, spawnOutside, the trader)
-    should be copied while standing on the spot, which gives a Z about 1 m above the floor. Replace them with real ones you copy in-game (see README).
+    should be copied while standing on the spot, which gives a Z about 1 m above the floor.
+    Replace them with real ones you copy in-game (see README).
 ]]
 
 Config = {}
@@ -98,7 +99,7 @@ Config.Pickups = {
     { model = 'prop_boxpile_06b',  coords = vec4(1064.50, -3101.00, -39.00, 180.0) },
 }
 
--- Place pickup props, the skip and the laptop on the floor/desk automatically.
+-- Drop the pickup props and the skip onto the floor automatically (the laptop is never moved).
 -- Turn this off if you set exact Z values and want them used as-is.
 Config.SnapPropsToGround = true
 
@@ -240,7 +241,6 @@ Config.Text = {
     tooFar = 'You are too far away.',
     inventoryFull = 'You cannot carry any more.',
     cancelled = 'Cancelled.',
-    dead = 'You cannot do that right now.',
     failed = 'Something went wrong. Please try again.',
     loadFailed = 'Could not load a model: %s',          -- model name
     coordsCopied = 'Copied to clipboard: %s',             -- the vec4 text
