@@ -92,12 +92,41 @@ Config.Laptop = {
 ------------------------------------------------------------------------------------------------
 Config.Pickups = {
     -- PLACEHOLDER positions spread around the reference point. Replace them with your own.
-    { model = 'prop_boxpile_07d',  coords = vec4(1052.50, -3110.50, -39.00, 0.0) },
-    { model = 'prop_boxpile_06b',  coords = vec4(1056.50, -3110.50, -39.00, 0.0) },
-    { model = 'prop_mb_crate_01a', coords = vec4(1060.50, -3110.50, -39.00, 0.0) },
-    { model = 'prop_cratepile_07a', coords = vec4(1064.50, -3110.50, -39.00, 0.0) },
-    { model = 'prop_boxpile_07d',  coords = vec4(1060.50, -3101.00, -39.00, 180.0) },
-    { model = 'prop_boxpile_06b',  coords = vec4(1064.50, -3101.00, -39.00, 180.0) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1052.9777, -3095.4482, -39.0000, 0) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1055.5084, -3095.4558, -39.0000, 2.5461) },
+    { model = 'prop_cratepile_07a',  coords = vec4(1057.9218, -3095.4487, -39.0000, 359.4731) },
+    { model = 'xm3_prop_xm3_box_wood03a',  coords = vec4(1060.3220, -3095.4653, -39.0000, 344.2460) },
+    { model = 'hei_prop_crate_stack_01',  coords = vec4(1062.8383, -3095.5203, -39.0000, 5.3204) },
+    { model = 'prop_cratepile_07a',  coords = vec4(1065.2114, -3095.7014, -39.0000, 2.0238) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1067.6525, -3095.3992, -39.0000, 2.6559) },
+    
+    { model = 'prop_boxpile_06b',  coords = vec4(1053.0531, -3102.6299, -39.0000, 176.6396) },
+    { model = 'hei_prop_crate_stack_01',  coords = vec4(1055.4275, -3102.4609, -39.0000, 181.3584) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1057.9220, -3102.5503, -39.0000, 177.9499) },
+    { model = 'prop_cratepile_07a',  coords = vec4(1060.3243, -3102.9175, -39.0000, 2.0134) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1062.7971, -3102.6858, -39.0000, 353.2433) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1065.2242, -3103.0610, -39.0000, 2.0917) },
+    { model = 'prop_cratepile_07a',  coords = vec4(1067.5684, -3102.7734, -39.0000, 354.5059) },
+
+
+    { model = 'xm3_prop_xm3_box_wood03a',  coords = vec4(1053.0603, -3109.7654, -39.0000, 174.2227) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1055.5167, -3109.8130, -39.0000, 182.4992) },
+    { model = 'hei_prop_crate_stack_01',  coords = vec4(1057.9010, -3109.7974, -39.0000, 182.8202) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1060.3092, -3109.7275, -39.0000, 177.4070) },
+    { model = 'xm3_prop_xm3_box_wood03a',  coords = vec4(1062.7003, -3109.7585, -39.0000, 180.8158) },
+    { model = 'prop_boxpile_06b',  coords = vec4(1065.1002, -3109.5457, -39.0000, 181.2572) },
+    { model = 'hei_prop_crate_stack_01',  coords = vec4(1067.5103, -3109.7551, -39.0000, 182.2997) },
+
+
+
+
+
+
+    -- { model = 'prop_boxpile_06b',  coords = vec4(1056.50, -3110.50, -39.00, 0.0) },
+    -- { model = 'prop_mb_crate_01a', coords = vec4(1060.50, -3110.50, -39.00, 0.0) },
+    -- { model = 'prop_cratepile_07a', coords = vec4(1064.50, -3110.50, -39.00, 0.0) },
+    -- { model = 'prop_boxpile_07d',  coords = vec4(1060.50, -3101.00, -39.00, 180.0) },
+    -- { model = 'prop_boxpile_06b',  coords = vec4(1064.50, -3101.00, -39.00, 180.0) },
 }
 
 -- Animation + short progress bar when picking a box up from a prop.
@@ -168,7 +197,7 @@ Config.Trader = {
     model = 's_m_y_dockwork_01',
     -- PLACEHOLDER. Copy this while standing where the ped should stand (the script lowers it by 1 m
     -- so the feet touch the floor, because your copied Z is the centre of your body).
-    coords = vec4(1062.00, -3104.00, -38.00, 90.0),
+    coords = vec4(1049.2433, -3094.9302, -38.9999, 211.7741),
 
     -- Idle behaviour. Use a scenario OR an animation. If scenario is set, it wins.
     -- Scenario list: https://github.com/DioneB/gtav-scenarios
