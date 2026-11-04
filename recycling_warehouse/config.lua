@@ -87,7 +87,8 @@ Config.Laptop = {
 ------------------------------------------------------------------------------------------------
 -- Pickup props (where boxes are collected)
 -- Add as many as you like. Each one is a real prop with its own model and position.
--- They never run out and have no cooldown.
+-- The server picks ONE of them at a time for each player: only that one glows and only that one
+-- can be used. After every delivery a different one is picked. They never run out.
 ------------------------------------------------------------------------------------------------
 Config.Pickups = {
     -- PLACEHOLDER positions spread around the reference point. Replace them with your own.
@@ -99,17 +100,22 @@ Config.Pickups = {
     { model = 'prop_boxpile_06b',  coords = vec4(1064.50, -3101.00, -39.00, 180.0) },
 }
 
+-- Animation + short progress bar when picking a box up from a prop.
+Config.PickupAction = {
+    duration = 1200,                          -- ms
+    animDict = 'pickup_object',               -- bend down and grab
+    animClip = 'pickup_low',
+}
+
 -- Drop the pickup props and the skip onto the floor automatically (the laptop is never moved).
 -- Turn this off if you set exact Z values and want them used as-is.
 Config.SnapPropsToGround = true
 
--- Outline ("glow") shown on pickup props when the player is near.
+-- Outline ("glow") on the ONE pickup prop the player should go to next.
+-- It shows while they are on shift and empty-handed.
 Config.Highlight = {
     enabled = true,
-    distance = 8.0,                           -- metres from the prop
     colour = { r = 80, g = 200, b = 255, a = 255 },
-    -- true = only glow while the player is on shift and empty-handed (i.e. when they can pick up).
-    onlyWhenUseful = true,
 }
 
 ------------------------------------------------------------------------------------------------
@@ -130,9 +136,10 @@ Config.Carry = {
     --         which blocks props created by clients.
     networked = true,
 
-    -- Controls blocked while carrying: sprint, jump, enter vehicle, attack, aim, cover, weapon wheel.
+    -- Controls blocked while carrying: jump, enter vehicle, attack, aim, cover, weapon wheel.
+    -- Sprinting is allowed. Add 21 to this list if you want to block it again.
     -- See https://docs.fivem.net/docs/game-references/controls/ for the numbers.
-    disabledControls = { 21, 22, 23, 24, 25, 44, 37 },
+    disabledControls = { 22, 23, 24, 25, 44, 37 },
 }
 
 ------------------------------------------------------------------------------------------------
@@ -144,8 +151,10 @@ Config.Skip = {
     spawnProp = true,
 
     progressDuration = 3000,                  -- ms
-    animDict = 'anim@heists@narcotics@trash',
-    animClip = 'throw_b',
+    animDict = 'mp_common',                   -- arms push forward at chest height (tip the box in)
+    animClip = 'givetake1_a',
+    -- Alternatives to try: 'anim@heists@narcotics@trash' + 'throw_b' (overhead throw),
+    --                      'pickup_object' + 'putdown_low' (put down low)
 }
 
 -- The item given for every box thrown into the skip.
@@ -228,14 +237,16 @@ Config.Text = {
     recycling = 'Recycling box...',
 
     -- notifications
-    shiftStarted = 'Shift started. Carry boxes to the skip.',
+    shiftStarted = 'Shift started. Collect the highlighted box and take it to the skip.',
     shiftEnded = 'Shift ended. Thanks for your work!',
     alreadyOnShift = 'You are already on shift.',
     notOnShift = 'You are not on shift. Sign in at the laptop.',
     alreadyCarrying = 'You can only carry one box at a time.',
     notCarrying = 'You are not carrying a box.',
+    picking = 'Picking up box...',
     pickedUp = 'Take the box to the skip.',
-    delivered = 'You received %d recycle box(es).',   -- amount
+    wrongSpot = 'Not that one. Look for the highlighted box.',
+    delivered = 'You received %d recycle box(es). Go to the next highlighted box.', -- amount
     boxDropped = 'You dropped the box.',
     tooFast = 'Slow down.',
     tooFar = 'You are too far away.',

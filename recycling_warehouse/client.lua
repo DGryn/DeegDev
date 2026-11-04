@@ -30,8 +30,7 @@ local interiorId = 0
 -- Things that only exist while the player is near the warehouse.
 local spawnedObjects = {}  -- every prop we created (skip, laptop, pickups)
 local pickupEntities = {}  -- [pickupIndex] = entity
-local nearPickup = {}      -- [pickupIndex] = true while within Config.Highlight.distance
-local glowPoints = {}      -- lib.points used for the outlines
+local activeSpot = nil     -- the ONE pickup the server told us to use next
 local traderPed = nil
 local areaLoaded = false
 
@@ -95,19 +94,17 @@ end
 -- Pickup outlines ("glow")
 ------------------------------------------------------------------------------------------------
 
-local function glowAllowed()
-    if not Config.Highlight.enabled then return false end
-    if Config.Highlight.onlyWhenUseful then return onShift and not carrying end
-    return true
+-- Can the player pick up from this prop right now? Used for both the glow and ox_target.
+local function isActivePickup(index)
+    return onShift and not carrying and index == activeSpot
 end
 
--- Turns the outline on for nearby pickups and off for the rest. Called whenever something changes.
+-- Outlines only the assigned pickup prop and turns it off on all others.
+-- Called whenever the shift, carry or assigned spot changes.
 local function refreshGlow()
-    local allowed = glowAllowed()
-
     for index, entity in pairs(pickupEntities) do
         if DoesEntityExist(entity) then
-            SetEntityDrawOutline(entity, allowed and nearPickup[index] == true)
+            SetEntityDrawOutline(entity, Config.Highlight.enabled and isActivePickup(index))
         end
     end
 end
@@ -145,7 +142,7 @@ local function dropBox(showMessage)
     if showMessage then notify('boxDropped') end
 end
 
--- Runs every frame, but ONLY while carrying. Blocks sprint/jump/etc. and watches for death.
+-- Runs every frame, but ONLY while carrying. Blocks jump/weapons/etc. and watches for death.
 local function carryLoop()
     local nextCheck = 0
 
@@ -208,9 +205,10 @@ end
 ------------------------------------------------------------------------------------------------
 
 local function startShift()
-    local ok, message = lib.callback.await('recycling_warehouse:startShift', false)
+    local ok, message, spot = lib.callback.await('recycling_warehouse:startShift', false)
     if ok then
         onShift = true
+        activeSpot = spot
         refreshGlow()
     end
     notify(message)
@@ -222,6 +220,7 @@ local function endShift()
     -- Whatever the server says, make sure the local state is clean.
     stopCarry()
     onShift = false
+    activeSpot = nil
     refreshGlow()
 
     if ok then notify(message) end
@@ -233,6 +232,18 @@ end
 
 local function pickupBox(index)
     if carrying then return notify('alreadyCarrying') end
+    if lib.progressActive() then return end
+
+    -- Short "bend down and grab" animation before the box appears in the hands.
+    local finished = lib.progressBar({
+        duration = Config.PickupAction.duration,
+        label = Text.picking,
+        useWhileDead = false,
+        canCancel = true,
+        disable = { move = true, car = true, combat = true, sprint = true },
+        anim = { dict = Config.PickupAction.animDict, clip = Config.PickupAction.animClip, flag = 0 },
+    })
+    if not finished then return notify('cancelled') end
 
     local ok, message = lib.callback.await('recycling_warehouse:pickupBox', false, index)
     if not ok then return notify(message) end
@@ -261,10 +272,11 @@ local function deliverBox()
     if not finished then return notify('cancelled') end
     if not carrying then return end -- e.g. died during the progress bar
 
-    local ok, message = lib.callback.await('recycling_warehouse:deliverBox', false)
+    local ok, message, nextSpot = lib.callback.await('recycling_warehouse:deliverBox', false)
     if not ok then return notify(message) end -- e.g. inventory full: they keep the box
 
-    stopCarry()
+    activeSpot = nextSpot
+    stopCarry() -- also lights up the next pickup
     notify(message, Config.RecycleAmount)
 end
 
@@ -397,23 +409,15 @@ local function spawnArea()
                     label = Text.pickup,
                     icon = Config.Icons.pickup,
                     distance = Config.Distance.pickup,
-                    canInteract = function() return onShift and not carrying end,
+                    -- Only the assigned prop shows the option, so you can't loot any of them.
+                    canInteract = function() return isActivePickup(index) end,
                     onSelect = function() pickupBox(index) end,
                 },
             })
-
-            -- Outline when the player is near this pickup.
-            if Config.Highlight.enabled then
-                glowPoints[#glowPoints + 1] = lib.points.new({
-                    coords = pickup.coords.xyz,
-                    distance = Config.Highlight.distance,
-                    onEnter = function() nearPickup[index] = true; refreshGlow() end,
-                    onExit = function() nearPickup[index] = nil; refreshGlow() end,
-                })
-            end
         end
     end
 
+    refreshGlow() -- light up the assigned prop if we are already on shift
     spawnTrader()
 end
 
@@ -423,10 +427,6 @@ local function despawnArea()
 
     -- A box can't leave the warehouse.
     dropBox(false)
-
-    for _, point in ipairs(glowPoints) do point:remove() end
-    glowPoints = {}
-    nearPickup = {}
 
     for _, entity in ipairs(spawnedObjects) do
         SetEntityDrawOutline(entity, false)
@@ -631,6 +631,7 @@ end
 RegisterNetEvent('esx:onPlayerLogout', function()
     stopCarry()
     onShift = false
+    activeSpot = nil
     refreshGlow()
 end)
 

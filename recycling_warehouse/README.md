@@ -4,7 +4,7 @@ A recycling job for ESX Legacy that uses ox_lib, ox_inventory and ox_target. It 
 
 1. Enter the medium cargo warehouse.
 2. Sign in at the laptop.
-3. Carry boxes one at a time from the pickup props to the skip. Each box gives 1 **recycle box**.
+3. Carry boxes one at a time to the skip. Only one pickup prop is highlighted at a time; collect from that one. Each box gives 1 **recycle box**, and a new prop lights up.
 4. Trade recycle boxes with the trader NPC for the materials you choose.
 
 ## Installation
@@ -78,7 +78,7 @@ The server decides everything. The client only sends "I want to do X", plus at m
 | Action | The server checks |
 |---|---|
 | Start shift | Not already on shift, and standing at the laptop |
-| Pick up | On shift, not already carrying, and standing at that pickup prop |
+| Pick up | On shift, not already carrying, it is the one prop the server assigned (random, changes after every delivery), and standing at it |
 | Deliver | On shift, carrying a box, standing at the skip, at least `progressDuration` since pickup, and room for the recycle box |
 | Trade | Standing at the trader, the material exists, enough recycle boxes, and room for the materials |
 
