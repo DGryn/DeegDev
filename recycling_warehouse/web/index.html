@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<!--
+    recycling_warehouse - custom screens (laptop + trader)
+
+    Plain HTML/CSS/JS, no build step: edit these files and restart the resource.
+    All text comes from Config.UIText in config.lua, so you normally don't need to touch this.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recycling Warehouse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Laptop: shift terminal -->
+    <div id="laptop" class="screen hidden" role="dialog" aria-modal="true" aria-labelledby="laptop-title">
+        <div class="window laptop">
+            <header class="topbar">
+                <div class="brand">
+                    <div class="mark" data-logo></div>
+                    <div>
+                        <p class="brand-name" data-brand></p>
+                        <h1 id="laptop-title" data-text="laptopTitle"></h1>
+                    </div>
+                </div>
+                <div class="topbar-actions">
+                    <span class="pill" id="shift-pill"></span>
+                    <button class="btn btn-primary" id="shift-button" type="button"></button>
+                    <button class="icon-btn" data-close type="button" aria-label="Close">&#x2715;</button>
+                </div>
+            </header>
+
+            <div class="laptop-grid">
+                <!-- Level -->
+                <section class="panel level-panel">
+                    <div class="ring" id="level-ring">
+                        <div class="ring-inner">
+                            <span class="ring-label" data-text="level"></span>
+                            <span class="ring-value" id="level-value">1</span>
+                        </div>
+                    </div>
+                    <p class="xp-text" id="xp-text"></p>
+
+                    <div class="perks">
+                        <h3 data-text="perksNow"></h3>
+                        <ul id="perks-now"></ul>
+                    </div>
+                    <div class="perks perks-next" id="perks-next-wrap">
+                        <h3 id="perks-next-title"></h3>
+                        <ul id="perks-next"></ul>
+                    </div>
+                </section>
+
+                <!-- Goals -->
+                <section class="panel goals-panel">
+                    <div class="panel-head">
+                        <h2 data-text="goalsTitle"></h2>
+                        <span class="muted small" id="reset-text"></span>
+                    </div>
+                    <div id="goals"></div>
+                </section>
+
+                <!-- Market -->
+                <section class="panel market-panel">
+                    <div class="panel-head">
+                        <h2 data-text="marketTitle"></h2>
+                    </div>
+                    <div id="market"></div>
+                </section>
+
+                <!-- Lifetime stats -->
+                <section class="panel stats-panel">
+                    <div class="panel-head">
+                        <h2 data-text="statsTitle"></h2>
+                    </div>
+                    <div class="stats" id="stats"></div>
+                </section>
+            </div>
+
+            <p class="status" id="laptop-status" role="status" aria-live="polite"></p>
+        </div>
+    </div>
+
+    <!-- Trader -->
+    <div id="trader" class="screen screen-right hidden" role="dialog" aria-modal="true" aria-labelledby="trader-title">
+        <div class="window trader">
+            <header class="trader-head">
+                <div class="brand">
+                    <div class="mark" data-logo></div>
+                    <div>
+                        <p class="brand-name" data-brand></p>
+                        <h1 id="trader-title" data-text="traderTitle"></h1>
+                    </div>
+                </div>
+                <button class="icon-btn" data-close type="button" aria-label="Close">&#x2715;</button>
+            </header>
+            <p class="muted trader-sub" data-text="traderSubtitle"></p>
+
+            <div class="balance">
+                <div>
+                    <p class="balance-label" data-text="yourBoxes"></p>
+                    <p class="balance-value" id="box-count">0</p>
+                </div>
+                <div class="balance-side">
+                    <span class="pill pill-accent" id="level-bonus"></span>
+                    <span class="muted small" id="trader-reset"></span>
+                </div>
+            </div>
+
+            <div id="materials" class="materials"></div>
+
+            <p class="status" id="trader-status" role="status" aria-live="polite"></p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

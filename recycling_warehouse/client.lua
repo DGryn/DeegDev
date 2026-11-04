@@ -13,7 +13,8 @@
     APIs used (checked against their source code on GitHub):
       ox_target   addSphereZone, removeZone, addLocalEntity, removeLocalEntity
       ox_lib      lib.points.new, lib.callback.await, lib.progressBar, lib.progressActive,
-                  lib.registerContext, lib.showContext, lib.notify, lib.requestModel, lib.requestAnimDict
+                  lib.skillCheck, lib.notify, lib.requestModel, lib.requestAnimDict
+      NUI         SendNUIMessage, SetNuiFocus, RegisterNUICallback (the screens live in web/)
 ]]
 
 local RESOURCE = GetCurrentResourceName()
@@ -30,6 +31,7 @@ local interiorId = 0
 -- Things that only exist while the player is near the warehouse.
 local spawnedObjects = {}  -- every prop we created (skip, laptop, pickups)
 local pickupEntities = {}  -- [pickupIndex] = entity
+local skipEntity = nil     -- the skip prop (outlined while carrying)
 local activeSpot = nil     -- the ONE pickup the server told us to use next
 local traderPed = nil
 local areaLoaded = false
@@ -39,7 +41,10 @@ local areaLoaded = false
 ------------------------------------------------------------------------------------------------
 
 -- These message keys are shown as green "success" notifications; everything else is red.
-local SUCCESS = { shiftStarted = true, shiftEnded = true, pickedUp = true, delivered = true, traded = true }
+local SUCCESS = {
+    shiftStarted = true, shiftEnded = true, pickedUp = true, delivered = true, traded = true,
+    skillHit = true, goalClaimed = true,
+}
 
 -- Shows Config.Text[key], filling in any %s / %d with the extra arguments.
 local function notify(key, ...)
@@ -99,13 +104,17 @@ local function isActivePickup(index)
     return onShift and not carrying and index == activeSpot
 end
 
--- Outlines only the assigned pickup prop and turns it off on all others.
+-- Outlines only the assigned pickup prop (when empty-handed) or the skip (when carrying).
 -- Called whenever the shift, carry or assigned spot changes.
 local function refreshGlow()
     for index, entity in pairs(pickupEntities) do
         if DoesEntityExist(entity) then
             SetEntityDrawOutline(entity, Config.Highlight.enabled and isActivePickup(index))
         end
+    end
+
+    if skipEntity and DoesEntityExist(skipEntity) then
+        SetEntityDrawOutline(skipEntity, Config.Highlight.enabled and Config.Highlight.skip and onShift and carrying)
     end
 end
 
@@ -204,6 +213,7 @@ end
 -- Shift
 ------------------------------------------------------------------------------------------------
 
+-- Both return ok, messageKey so the laptop screen can show the result.
 local function startShift()
     local ok, message, spot = lib.callback.await('recycling_warehouse:startShift', false)
     if ok then
@@ -211,7 +221,7 @@ local function startShift()
         activeSpot = spot
         refreshGlow()
     end
-    notify(message)
+    return ok, message
 end
 
 local function endShift()
@@ -223,7 +233,7 @@ local function endShift()
     activeSpot = nil
     refreshGlow()
 
-    if ok then notify(message) end
+    return ok, message
 end
 
 ------------------------------------------------------------------------------------------------
@@ -260,6 +270,10 @@ end
 local function deliverBox()
     if not carrying or lib.progressActive() then return end
 
+    -- Step 1: the server checks we're allowed and decides if there's a skill check.
+    local allowed, startMessage, skill = lib.callback.await('recycling_warehouse:startDeliver', false)
+    if not allowed then return notify(startMessage) end
+
     local finished = lib.progressBar({
         duration = Config.Skip.progressDuration,
         label = Text.recycling,
@@ -272,65 +286,115 @@ local function deliverBox()
     if not finished then return notify('cancelled') end
     if not carrying then return end -- e.g. died during the progress bar
 
-    local ok, message, nextSpot = lib.callback.await('recycling_warehouse:deliverBox', false)
+    -- Optional skill check, only if the server asked for one.
+    local hit = false
+    if skill then
+        hit = lib.skillCheck(skill.difficulty, skill.keys) == true
+        if not carrying then return end -- e.g. died during the skill check
+    end
+
+    -- Step 2: the server re-checks everything and hands out the reward.
+    local ok, message, result = lib.callback.await('recycling_warehouse:finishDeliver', false, hit)
     if not ok then return notify(message) end -- e.g. inventory full: they keep the box
 
-    activeSpot = nextSpot
-    stopCarry() -- also lights up the next pickup
-    notify(message, Config.RecycleAmount)
+    activeSpot = result.nextSpot
+    stopCarry() -- also moves the glow back to the next pickup
+    notify(message, result.boxes)
+
+    if result.skill then
+        if result.hit then
+            notify('skillHit', Config.SkillCheck.bonusBoxes)
+        else
+            notify('skillMiss')
+        end
+    end
 end
 
 ------------------------------------------------------------------------------------------------
--- Trader menu
+-- Custom screens (laptop + trader). The HTML/CSS/JS is in the web/ folder.
 ------------------------------------------------------------------------------------------------
 
-local openTraderMenu -- defined below; declared here so tradeMaterial can call it
+local openScreen = nil -- 'laptop', 'trader' or nil
 
-local function tradeMaterial(index, count)
-    local material = Config.Materials[index]
+-- Turns a Config.Text key into the final sentence (used for messages shown inside the screens).
+local function message(key, ...)
+    local text = Text[key] or Text.failed
+    if select('#', ...) > 0 then text = text:format(...) end
+    return text
+end
 
-    -- Quick local check for instant feedback. The server checks again for real.
-    if count < material.cost then
-        notify('cannotAfford', material.cost, material.label, count)
-        return openTraderMenu(count)
+local function closeScreen()
+    if not openScreen then return end
+    openScreen = nil
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'close' })
+end
+
+-- Asks the server for fresh data and sends it to the open screen.
+local function refreshScreen(status)
+    if openScreen == 'laptop' then
+        local data = lib.callback.await('recycling_warehouse:getLaptopData', false)
+        if not data then closeScreen(); return notify('noProfile') end
+        SendNUIMessage({ action = 'laptop', data = data, status = status })
+    elseif openScreen == 'trader' then
+        local data = lib.callback.await('recycling_warehouse:getTraderData', false)
+        if not data then closeScreen(); return notify('noProfile') end
+        SendNUIMessage({ action = 'trader', data = data, status = status })
     end
+end
 
-    local ok, message, newCount = lib.callback.await('recycling_warehouse:trade', false, index)
+local function openUi(screen)
+    if openScreen then return end
+    openScreen = screen
 
+    -- The screen needs the text and style settings the first time; sending them each time is cheap.
+    SendNUIMessage({ action = 'setup', text = Config.UIText, ui = Config.UI })
+    refreshScreen()
+
+    if openScreen then SetNuiFocus(true, true) end
+end
+
+-- Messages from the screens (web/app.js -> post('name', data)).
+RegisterNUICallback('close', function(_, cb)
+    closeScreen()
+    cb(true)
+end)
+
+RegisterNUICallback('startShift', function(_, cb)
+    local ok, key = startShift()
+    cb(true)
+    if ok then notify(key) end
+    refreshScreen({ ok = ok, text = message(key) })
+end)
+
+RegisterNUICallback('endShift', function(_, cb)
+    local ok, key = endShift()
+    cb(true)
+    if ok then notify(key) end
+    refreshScreen({ ok = ok, text = message(key) })
+end)
+
+RegisterNUICallback('claimGoal', function(data, cb)
+    local ok, key = lib.callback.await('recycling_warehouse:claimGoal', false, tonumber(data.index))
+    cb(true)
+    refreshScreen({ ok = ok, text = message(key) })
+end)
+
+RegisterNUICallback('trade', function(data, cb)
+    local ok, key, result = lib.callback.await('recycling_warehouse:trade', false, tonumber(data.index), tonumber(data.times))
+    cb(true)
+
+    local text
     if ok then
-        notify('traded', material.cost, material.amount, material.label)
-    elseif message == 'cannotAfford' then
-        notify('cannotAfford', material.cost, material.label, newCount)
+        text = message('traded', result.cost, result.amount, result.label)
+    elseif key == 'cannotAfford' then
+        text = Config.UIText.notEnough
     else
-        notify(message)
+        text = message(key)
     end
 
-    -- Reopen the menu so the player can keep trading (unless they walked away).
-    if message ~= 'tooFar' then openTraderMenu(newCount) end
-end
-
-function openTraderMenu(count)
-    count = count or lib.callback.await('recycling_warehouse:getRecycleCount', false) or 0
-
-    local options = {
-        { title = Text.balance:format(count), icon = Config.Icons.balance, readOnly = true },
-    }
-
-    for index, material in ipairs(Config.Materials) do
-        local affordable = count >= material.cost
-
-        options[#options + 1] = {
-            title = material.label,
-            description = Text.materialDesc:format(material.cost, material.amount),
-            icon = Config.Icons.material,
-            iconColor = affordable and '#4ade80' or '#f87171', -- green if affordable, red if not
-            onSelect = function() tradeMaterial(index, count) end,
-        }
-    end
-
-    lib.registerContext({ id = 'recycling_warehouse_trader', title = Text.traderTitle, options = options })
-    lib.showContext('recycling_warehouse_trader')
-end
+    refreshScreen({ ok = ok, text = text })
+end)
 
 ------------------------------------------------------------------------------------------------
 -- Spawning / despawning the warehouse contents
@@ -363,7 +427,7 @@ local function spawnTrader()
             icon = Config.Icons.trader,
             distance = Config.Distance.trader,
             canInteract = function() return not cfg.requireShift or onShift end,
-            onSelect = function() openTraderMenu() end,
+            onSelect = function() openUi('trader') end,
         },
     })
 end
@@ -377,6 +441,7 @@ local function spawnArea()
 
     -- Skip (recycle point)
     local skip = Config.Skip.spawnProp and spawnProp(Config.Skip.model, Config.Skip.coords, Config.SnapPropsToGround)
+    skipEntity = skip or nil
     if skip then
         target:addLocalEntity(skip, {
             {
@@ -435,6 +500,7 @@ local function despawnArea()
     end
     spawnedObjects = {}
     pickupEntities = {}
+    skipEntity = nil
 
     if traderPed then
         target:removeLocalEntity(traderPed)
@@ -512,7 +578,8 @@ end
 
 local function leaveWarehouse()
     if Config.Exit.endShiftOnExit and onShift then
-        endShift()
+        local ok, key = endShift()
+        if ok then notify(key) end
     else
         dropBox(false)
     end
@@ -560,27 +627,19 @@ local function setupZones()
         },
     })
 
-    -- Laptop: only shows the option that makes sense right now.
+    -- Laptop: opens the shift terminal screen (start/end shift, goals, level, stats, rates).
     zoneIds[#zoneIds + 1] = target:addSphereZone({
         coords = Config.Laptop.coords.xyz,
         radius = Config.Laptop.radius,
         debug = Config.Debug,
         options = {
             {
-                name = 'recycling_warehouse:startShift',
-                label = Text.startShift,
-                icon = Config.Icons.startShift,
+                name = 'recycling_warehouse:laptop',
+                label = Text.useLaptop,
+                icon = Config.Icons.laptop,
                 distance = Config.Distance.laptop,
-                canInteract = function() return not onShift end,
-                onSelect = startShift,
-            },
-            {
-                name = 'recycling_warehouse:endShift',
-                label = Text.endShift,
-                icon = Config.Icons.endShift,
-                distance = Config.Distance.laptop,
-                canInteract = function() return onShift end,
-                onSelect = endShift,
+                canInteract = function() return not carrying end,
+                onSelect = function() openUi('laptop') end,
             },
         },
     })
@@ -629,6 +688,7 @@ end
 
 -- ESX character logout / switch: the server clears its side, we clear ours.
 RegisterNetEvent('esx:onPlayerLogout', function()
+    closeScreen()
     stopCarry()
     onShift = false
     activeSpot = nil
@@ -642,6 +702,7 @@ AddEventHandler('onResourceStop', function(resource)
     stopCarry()
     despawnArea()
     areaPoint:remove()
+    if openScreen then SetNuiFocus(false, false) end
 
     for _, id in ipairs(zoneIds) do target:removeZone(id) end
     if blip then RemoveBlip(blip) end

@@ -145,6 +145,7 @@ Config.SnapPropsToGround = true
 Config.Highlight = {
     enabled = true,
     colour = { r = 80, g = 200, b = 255, a = 255 },
+    skip = true,                              -- also outline the skip while you carry a box
 }
 
 ------------------------------------------------------------------------------------------------
@@ -244,6 +245,7 @@ Config.Icons = {
     trader = 'fa-solid fa-handshake',
     material = 'fa-solid fa-cubes',
     balance = 'fa-solid fa-box-open',
+    laptop = 'fa-solid fa-laptop',
 }
 
 ------------------------------------------------------------------------------------------------
@@ -291,4 +293,188 @@ Config.Text = {
     materialDesc = 'Costs %d recycle box(es) - you get %d', -- cost, amount
     cannotAfford = 'You need %d recycle box(es) for %s. You have %d.', -- cost, label, count
     traded = 'You traded %d recycle box(es) for %dx %s.', -- cost, amount, label
+
+    -- added with levels / goals / skill check / rare finds / custom UI
+    useLaptop = 'Use laptop',
+    skillHit = 'Clean throw! +%d bonus box(es).',      -- bonus boxes
+    skillMiss = 'Missed the skill check.',
+    levelUp = 'Level up! You are now level %d.',       -- level
+    rareFind = 'While sorting the box you found %dx %s!', -- amount, item label
+    rareNoRoom = 'You found %s but had no room for it.', -- item label
+    goalDone = 'Goal complete: %s',                    -- goal text
+    goalClaimLater = 'Goal complete: %s. No room for the reward - claim it at the laptop.', -- goal text
+    goalClaimed = 'Reward claimed.',
+    notClaimable = 'That reward cannot be claimed.',
+    invalidAmount = 'Choose a valid amount.',
+    noProfile = 'Your job profile could not be loaded. Try again in a moment.',
+}
+
+------------------------------------------------------------------------------------------------
+-- Database
+-- One table stores each character's XP, lifetime stats and today's goals.
+------------------------------------------------------------------------------------------------
+-- true = the script creates the table on start if it is missing. You can also run
+-- install/recycling_warehouse.sql yourself and set this to false.
+Config.AutoCreateTable = true
+
+------------------------------------------------------------------------------------------------
+-- Daily reset
+-- At this hour of the SERVER's clock (0-23) the trade rates change and new goals become available.
+------------------------------------------------------------------------------------------------
+Config.DailyResetHour = 0
+
+------------------------------------------------------------------------------------------------
+-- Skill check at the skip
+-- After the progress bar there is a chance of a quick ox_lib skill check.
+-- Hit = bonus boxes and bonus XP. Miss (or no check) = the normal amount.
+------------------------------------------------------------------------------------------------
+Config.SkillCheck = {
+    enabled = true,
+    chance = 35,                              -- % of deliveries that ask for a skill check
+    difficulty = { 'easy', 'medium' },        -- one entry per circle: 'easy', 'medium' or 'hard'
+    keys = { 'e' },                           -- keys the player may have to press
+    bonusBoxes = 1,                           -- extra recycle boxes for a hit
+    bonusXp = 15,                             -- extra XP for a hit
+}
+
+------------------------------------------------------------------------------------------------
+-- Experience and levels
+------------------------------------------------------------------------------------------------
+Config.Xp = {
+    perBox = 10,                              -- XP for every box delivered
+}
+
+-- xp = total XP needed to reach the level. The perks of your CURRENT level apply (they don't add up):
+--   bonusBoxes  extra recycle boxes per delivery
+--   tradeBonus  % extra materials from every trade
+--   rareChance  % added to Config.RareFinds.chance
+Config.Levels = {
+    { xp = 0,    bonusBoxes = 0, tradeBonus = 0,  rareChance = 0 }, -- level 1
+    { xp = 150,  bonusBoxes = 0, tradeBonus = 5,  rareChance = 0 }, -- level 2
+    { xp = 400,  bonusBoxes = 0, tradeBonus = 10, rareChance = 1 }, -- level 3
+    { xp = 800,  bonusBoxes = 1, tradeBonus = 10, rareChance = 1 }, -- level 4
+    { xp = 1400, bonusBoxes = 1, tradeBonus = 15, rareChance = 2 }, -- level 5
+    { xp = 2200, bonusBoxes = 1, tradeBonus = 20, rareChance = 3 }, -- level 6
+    { xp = 3200, bonusBoxes = 2, tradeBonus = 25, rareChance = 4 }, -- level 7
+}
+
+------------------------------------------------------------------------------------------------
+-- Daily trade rates
+-- Every day each material in Config.Materials gets a rating that changes how much you GET per
+-- trade (cost stays the same). The rates are worked out from the date, so a restart does not
+-- change them and everyone sees the same rates.
+------------------------------------------------------------------------------------------------
+Config.Market = {
+    ratings = {
+        { key = 'great',  label = 'Great value', multiplier = 1.5 },
+        { key = 'normal', label = 'Normal',      multiplier = 1.0 },
+        { key = 'poor',   label = 'Poor value',  multiplier = 0.6 },
+    },
+    -- Handed to one random material each, every day (so there is always one great and one poor deal).
+    guaranteed = { 'great', 'poor' },
+    -- Every other material picks one of these at random. Repeat a key to make it more likely.
+    randomPool = { 'normal', 'normal', 'great', 'poor' },
+
+    -- The trader screen lets players do up to this many trades of one material in a single click.
+    maxTradesAtOnce = 20,
+}
+
+------------------------------------------------------------------------------------------------
+-- Daily shift goals
+-- The first shift of the day gives each player `perDay` random goals from the pool.
+--   type    'deliver' = boxes delivered     'skill' = skill checks hit
+--           'trade'   = trades made         'spend' = recycle boxes spent at the trader
+--   label   %d is replaced with the target
+--   reward  items and/or xp. Given automatically when the goal is finished; if the inventory is
+--           full, the player can claim it at the laptop instead.
+-- Each id must be unique.
+------------------------------------------------------------------------------------------------
+Config.Goals = {
+    enabled = true,
+    perDay = 3,
+    pool = {
+        { id = 'deliver10', type = 'deliver', target = 10, label = 'Deliver %d boxes',
+          reward = { xp = 40, items = { { item = 'plastic', count = 6 } } } },
+        { id = 'deliver25', type = 'deliver', target = 25, label = 'Deliver %d boxes',
+          reward = { xp = 100, items = { { item = 'aluminum', count = 6 } } } },
+        { id = 'skill3', type = 'skill', target = 3, label = 'Hit %d skill checks',
+          reward = { xp = 50, items = { { item = 'glass', count = 6 } } } },
+        { id = 'skill6', type = 'skill', target = 6, label = 'Hit %d skill checks',
+          reward = { xp = 90, items = { { item = 'copper', count = 4 } } } },
+        { id = 'trade2', type = 'trade', target = 2, label = 'Make %d trades',
+          reward = { xp = 30, items = { { item = 'recycle_box', count = 2 } } } },
+        { id = 'spend10', type = 'spend', target = 10, label = 'Spend %d recycle boxes at the trader',
+          reward = { xp = 60, items = { { item = 'copper', count = 3 } } } },
+    },
+}
+
+------------------------------------------------------------------------------------------------
+-- Rare finds
+-- Each delivered box has a small chance to contain something unusual. Use items from your other
+-- jobs here. weight = how likely compared to the others; min/max = how many.
+------------------------------------------------------------------------------------------------
+Config.RareFinds = {
+    enabled = true,
+    chance = 3,                               -- % per box (levels add their rareChance on top)
+    items = {
+        { item = 'circuit_board', weight = 50, min = 1, max = 2 },
+        { item = 'copper_wire',   weight = 35, min = 1, max = 3 },
+        { item = 'gold_watch',    weight = 15, min = 1, max = 1 },
+    },
+}
+
+------------------------------------------------------------------------------------------------
+-- Custom screens (laptop + trader)
+------------------------------------------------------------------------------------------------
+Config.UI = {
+    brand = 'Paradox Roleplay',               -- small server name shown on both screens
+    logo = nil,                               -- e.g. 'logo.png' placed in recycling_warehouse/web/ (nil = no logo)
+    accent = '#8b5cf6',                       -- main purple; everything else is tuned around it
+}
+
+-- All text on the custom screens. %d / %s are filled in, in the order given in the comment.
+-- Write %% for a literal percent sign.
+Config.UIText = {
+    -- laptop
+    laptopTitle = 'Recycling Warehouse',
+    onShift = 'On shift',
+    offShift = 'Signed out',
+    startShift = 'Start shift',
+    endShift = 'End shift',
+    level = 'Level',
+    xpProgress = '%d / %d XP',                -- xp into this level, xp needed for the next
+    maxLevel = 'Max level',
+    perksNow = 'Your perks',
+    perksNext = 'At level %d',                -- next level
+    perkBonusBoxes = '+%d box(es) per delivery',
+    perkTradeBonus = '+%d%% materials from trades',
+    perkRareChance = '+%d%% rare find chance',
+    noPerks = 'No perks yet - keep recycling.',
+    goalsTitle = "Today's goals",
+    goalsEmpty = "Start a shift to get today's goals.",
+    goalsOff = 'Goals are switched off.',
+    reward = 'Reward: %s',                    -- reward text
+    claim = 'Claim',
+    claimed = 'Claimed',
+    statsTitle = 'Lifetime',
+    statBoxes = 'Boxes delivered',
+    statSkill = 'Skill checks hit',
+    statTrades = 'Trades',
+    statRare = 'Rare finds',
+    statGoals = 'Goals done',
+    statShifts = 'Shifts',
+    marketTitle = "Today's trade rates",
+    resetsIn = 'New rates and goals in %s',   -- time like 5h 12m
+    close = 'Close',
+
+    -- trader
+    traderTitle = 'Recycling Trader',
+    traderSubtitle = 'Swap your recycle boxes for materials. Rates change daily.',
+    yourBoxes = 'Your recycle boxes',
+    levelBonus = 'Level bonus +%d%%',         -- trade bonus
+    costEach = '%d box(es) each',             -- cost per trade
+    getsEach = 'You get %d per trade',        -- amount per trade
+    total = '%d box(es) for %dx %s',          -- total cost, total amount, label
+    trade = 'Trade',
+    notEnough = 'Not enough boxes',
 }

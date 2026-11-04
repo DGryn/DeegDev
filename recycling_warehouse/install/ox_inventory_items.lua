@@ -55,3 +55,32 @@
     description = 'Recycled copper.',
     client = { image = 'scrapmetal.png' },
 },
+
+-- Example rare finds (Config.RareFinds). Replace with items from your other jobs if you like.
+
+['circuit_board'] = {
+    label = 'Circuit Board',
+    weight = 100,
+    stack = true,
+    close = true,
+    description = 'Salvaged electronics. Someone will want this.',
+    client = { image = 'usb_black.png' },
+},
+
+['copper_wire'] = {
+    label = 'Copper Wire',
+    weight = 150,
+    stack = true,
+    close = true,
+    description = 'A tangle of copper wire.',
+    client = { image = 'scrapmetal.png' },
+},
+
+['gold_watch'] = {
+    label = 'Old Gold Watch',
+    weight = 100,
+    stack = true,
+    close = true,
+    description = 'Somebody threw this out by mistake.',
+    client = { image = 'phone.png' },
+},
