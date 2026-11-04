@@ -3,7 +3,7 @@
 
     The server is the authority. The client only ASKS to do things; every request is checked here:
       - Start shift      -> not already on shift, standing at the laptop
-      - Pick up a box    -> on shift, empty-handed, standing at a real pickup prop from the config
+      - Pick up a box    -> on shift, empty-handed, standing at THE pickup prop the server assigned
       - Deliver a box    -> on shift, carrying, standing at the skip, enough time has passed,
                             room in the inventory for the recycle box
       - Trade            -> standing at the trader, a real material from the config, enough recycle
@@ -24,7 +24,7 @@
 local RESOURCE = GetCurrentResourceName()
 local inventory = exports.ox_inventory
 
--- Players[src] = { onShift = true, carrying = false, pickedUpAt = 0, propNetId = nil }
+-- Players[src] = { onShift = true, carrying = false, pickedUpAt = 0, propNetId = nil, activeSpot = 1 }
 local Players = {}
 
 -- Hashes can come back signed or unsigned depending on the native, so compare them like this.
@@ -82,6 +82,19 @@ local function clearPlayer(src)
     debugLog(src, 'job state cleared')
 end
 
+-- Picks the pickup prop the player must use next: a random one, never the same one twice in a row.
+local function pickNextSpot(state)
+    local total = #Config.Pickups
+    local spot = math.random(total)
+
+    if total > 1 then
+        while spot == state.activeSpot do spot = math.random(total) end
+    end
+
+    state.activeSpot = spot
+    return spot
+end
+
 ------------------------------------------------------------------------------------------------
 -- Shift
 ------------------------------------------------------------------------------------------------
@@ -90,9 +103,12 @@ lib.callback.register('recycling_warehouse:startShift', function(source)
     if Players[source] then return false, 'alreadyOnShift' end
     if not isNear(source, Config.Laptop.coords, Config.Distance.laptop) then return false, 'tooFar' end
 
-    Players[source] = { onShift = true, carrying = false, pickedUpAt = 0, propNetId = nil }
+    local state = { onShift = true, carrying = false, pickedUpAt = 0, propNetId = nil, activeSpot = nil }
+    Players[source] = state
     debugLog(source, 'started shift')
-    return true, 'shiftStarted'
+
+    -- Also tell the client which prop to highlight.
+    return true, 'shiftStarted', pickNextSpot(state)
 end)
 
 -- No distance check: ending a shift only takes things away from the player, so it is always allowed.
@@ -112,9 +128,9 @@ lib.callback.register('recycling_warehouse:pickupBox', function(source, spotInde
     if not state then return false, 'notOnShift' end
     if state.carrying then return false, 'alreadyCarrying' end
 
-    -- The client only sends which spot it used. The position comes from OUR config.
-    local spot = type(spotIndex) == 'number' and Config.Pickups[spotIndex]
-    if not spot then return false, 'failed' end
+    -- Only the spot the server assigned counts. The position comes from OUR config.
+    if spotIndex ~= state.activeSpot then return false, 'wrongSpot' end
+    local spot = Config.Pickups[spotIndex]
     if not isNear(source, spot.coords, Config.Distance.pickup) then return false, 'tooFar' end
 
     state.carrying = true
@@ -169,7 +185,9 @@ lib.callback.register('recycling_warehouse:deliverBox', function(source)
 
     clearCarry(state)
     debugLog(source, 'delivered a box')
-    return true, 'delivered'
+
+    -- Also tell the client which prop to highlight next.
+    return true, 'delivered', pickNextSpot(state)
 end)
 
 -- The client says it lost the box (death, getting in a vehicle, leaving the area).
