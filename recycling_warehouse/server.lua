@@ -23,6 +23,14 @@
 ]]
 
 local RESOURCE = GetCurrentResourceName()
+
+-- oxmysql's MySQL helper is loaded by fxmanifest.lua ('@oxmysql/lib/MySQL.lua'). If it's missing,
+-- stop here with a clear message instead of crashing later.
+if not MySQL then
+    error('oxmysql is not loaded. Check that fxmanifest.lua lists \'@oxmysql/lib/MySQL.lua\' under server_scripts, '
+        .. 'that oxmysql starts before this resource, and type "refresh" in the console after changing fxmanifest.lua.')
+end
+
 local ESX = exports.es_extended:getSharedObject()
 local inventory = exports.ox_inventory
 local Text = Config.Text
