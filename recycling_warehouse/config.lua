@@ -50,11 +50,11 @@ Config.Interior = {
 ------------------------------------------------------------------------------------------------
 Config.Entrance = {
     -- Where the player interacts OUTSIDE to go in. PLACEHOLDER: a spot in the docks area.
-    coords = vec3(1017.40, -3112.00, 5.90),
+    coords = vec3(746.8029, -1399.3375, 26.6241),
     radius = 1.5,                                     -- size of the interaction zone
     -- Where the player appears INSIDE the warehouse.
     -- PLACEHOLDER: just inside the door, near the reference point.
-    spawnInside = vec4(1049.60, -3097.20, -38.00, 270.0),
+    spawnInside = vec4(1048.4857, -3097.1399, -39.0000, 270),
 
     -- Map blip for the entrance. Set blip = false to hide it.
     blip = { sprite = 365, colour = 2, scale = 0.8 },
@@ -65,7 +65,7 @@ Config.Exit = {
     coords = vec3(1048.20, -3097.20, -38.50),
     radius = 1.5,
     -- Where the player appears OUTSIDE after leaving. PLACEHOLDER: next to the entrance.
-    spawnOutside = vec4(1017.40, -3110.50, 5.90, 0.0),
+    spawnOutside = vec4(746.7480, -1399.7970, 26.5920, 183.3706),
 
     -- Leaving the warehouse ends the shift automatically (any carried box is dropped).
     endShiftOnExit = true,
