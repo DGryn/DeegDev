@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gruppe 6</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Tablet -->
+    <div id="tablet" class="shell hidden">
+        <aside class="rail">
+            <div class="logo">G6</div>
+            <nav class="rail-nav">
+                <button class="rail-btn active" data-page="overview" title="Overview"></button>
+                <button class="rail-btn" data-page="progress" title="Progress"></button>
+                <button class="rail-btn" data-page="jobs" title="Jobs"></button>
+            </nav>
+            <button class="rail-btn rail-exit" data-close title="Close"></button>
+        </aside>
+        <main class="main">
+            <header class="topbar" id="topbar"></header>
+            <section class="page" id="page"></section>
+        </main>
+    </div>
+
+    <!-- Black market -->
+    <div id="market" class="shell shell-sm hidden"></div>
+
+    <!-- Group invite -->
+    <div id="invite" class="modal hidden"></div>
+
+    <!-- Thermite minigame -->
+    <div id="minigame" class="modal hidden"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
